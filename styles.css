@@ -6,3 +6,19 @@ available in the app when your plugin is enabled.
 If your plugin does not need CSS, delete this file.
 
 */
+
+.cm-completed-task-widget {
+  background-color: green;
+  color: white;
+  padding: 0px 4px;
+  border-radius: 3px;
+  font-weight: bold;
+}
+
+.completed-task-reading {
+  background-color: lightgreen;
+  color: darkgreen;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-family: monospace;
+}
