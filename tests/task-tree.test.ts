@@ -55,7 +55,7 @@ describe('TaskTree', () => {
     tree.addSubtask(parent, subtask);
     // Now parent has one child, so total tasks = 1, completed = 1
     expect(tree.getCounts()).toEqual({ total: 1, completed: 1 });
-    expect(tree.getCompletionString()).toBe('Complete 100% (1/1)');
+    expect(tree.getCompletionString()).toBe('Complete 100% (1/1) ❗');
   });
 
   test('should throw an error when adding subtask to non-existent parent', () => {
@@ -64,5 +64,27 @@ describe('TaskTree', () => {
     const tree = new TaskTree([existing]);
     const subtask: ParsedTaskNode = { completed: false, children: [] };
     expect(() => tree.addSubtask(nonExistent, subtask)).toThrow('Parent task not found');
+  });
+
+  test('should append exclamation icon when parent marked completed but child is incomplete', () => {
+    const malformed: ParsedTaskNode = {
+      completed: true,
+      children: [ { completed: false, children: [] } ]
+    };
+    const tree = new TaskTree([malformed]);
+    // processNode counts total=1, completed=0 => 0%
+    expect(tree.getCounts()).toEqual({ total: 1, completed: 0 });
+    expect(tree.getCompletionString()).toBe('Complete 0% (0/1) ❗');
+  });
+
+  test('should append exclamation icon when parent marked incomplete but all children are complete', () => {
+    const malformed: ParsedTaskNode = {
+      completed: false,
+      children: [ { completed: true, children: [] } ]
+    };
+    const tree = new TaskTree([malformed]);
+    // processNode counts total=1, completed=1 => 100%
+    expect(tree.getCounts()).toEqual({ total: 1, completed: 1 });
+    expect(tree.getCompletionString()).toBe('Complete 100% (1/1) ❗');
   });
 });

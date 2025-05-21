@@ -152,6 +152,12 @@ export default class MyPlugin extends Plugin {
                             const matchStart = from + match.index;
                             const matchEnd = matchStart + match[0].length;
 
+                            // Skip rendering the widget when the cursor is inside the inline field to allow direct editing
+                            const cursorPos = view.state.selection.main.head;
+                            if (cursorPos >= matchStart && cursorPos <= matchEnd) {
+                                continue;
+                            }
+
                             // Check if the match is already decorated or part of a more complex syntax node
                             // This is a simplified check; more robust parsing might be needed
                             let covered = false;

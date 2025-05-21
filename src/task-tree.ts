@@ -41,7 +41,7 @@ export class TaskTree {
      * @param node The task node to process.
      * @returns TaskCounts for the given node and its descendants.
      */
-    private processNode(node: ParsedTaskNode): TaskCounts {
+    protected processNode(node: ParsedTaskNode): TaskCounts {
         if (!node.children || node.children.length === 0) {
             // Leaf node: counts as 1 task.
             return {
@@ -84,15 +84,19 @@ export class TaskTree {
     /**
      * Generates a string representation of the task completion status.
      * Example: "Complete 50% (1/2)"
-     * @returns A string describing the completion status.
+     * @returns A string describing the completion status, with a warning icon if any node is malformed.
      */
     public getCompletionString(): string {
         const counts = this.getCounts();
         if (counts.total === 0) {
             return "No tasks";
         }
-        const percentage = counts.total > 0 ? Math.round((counts.completed / counts.total) * 100) : 0;
-        return `Complete ${percentage}% (${counts.completed}/${counts.total})`;
+        const percentage = Math.round((counts.completed / counts.total) * 100);
+        let result = `Complete ${percentage}% (${counts.completed}/${counts.total})`;
+        if (this.hasMalformed()) {
+            result += ' ❗';
+        }
+        return result;
     }
 
     /**
@@ -126,5 +130,29 @@ export class TaskTree {
             }
         }
         return null;
+    }
+
+    /**
+     * Checks for inconsistent completion flags:
+     * - A parent marked completed while not all children are complete.
+     * - A parent marked incomplete while all children are complete.
+     */
+    private hasMalformed(): boolean {
+        const checkNode = (node: ParsedTaskNode): boolean => {
+            if (node.children && node.children.length > 0) {
+                const counts = this.processNode(node);
+                if ((node.completed && counts.completed < counts.total) ||
+                    (!node.completed && counts.completed === counts.total)) {
+                    return true;
+                }
+                for (const child of node.children) {
+                    if (checkNode(child)) {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        };
+        return this.rootNodes.some(checkNode);
     }
 }
