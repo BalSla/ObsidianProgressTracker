@@ -94,4 +94,37 @@ export class TaskTree {
         const percentage = counts.total > 0 ? Math.round((counts.completed / counts.total) * 100) : 0;
         return `Complete ${percentage}% (${counts.completed}/${counts.total})`;
     }
+
+    /**
+     * Adds a subtask to the specified parent task in the tree.
+     * @param parent The parent ParsedTaskNode to which the subtask will be added.
+     * @param subtask The ParsedTaskNode to add as a subtask.
+     * @throws Error if the parent task is not found in the tree.
+     */
+    public addSubtask(parent: ParsedTaskNode, subtask: ParsedTaskNode): void {
+        const found = this.findNode(parent, this.rootNodes);
+        if (!found) {
+            throw new Error('Parent task not found');
+        }
+        found.children.push(subtask);
+    }
+
+    /**
+     * Recursively searches for the target node in the given node list.
+     * @param target The node to find.
+     * @param nodes The current list of nodes to search.
+     * @returns The found node or null.
+     */
+    private findNode(target: ParsedTaskNode, nodes: ParsedTaskNode[]): ParsedTaskNode | null {
+        for (const node of nodes) {
+            if (node === target) {
+                return node;
+            }
+            const foundChild = this.findNode(target, node.children);
+            if (foundChild) {
+                return foundChild;
+            }
+        }
+        return null;
+    }
 }

@@ -47,4 +47,22 @@ describe('TaskTree', () => {
     expect(tree.getCounts()).toEqual({ total: 2, completed: 1 });
     expect(tree.getCompletionString()).toBe('Complete 50% (1/2)');
   });
+
+  test('should add subtask to specified parent and update counts', () => {
+    const parent: ParsedTaskNode = { completed: false, children: [] };
+    const tree = new TaskTree([parent]);
+    const subtask: ParsedTaskNode = { completed: true, children: [] };
+    tree.addSubtask(parent, subtask);
+    // Now parent has one child, so total tasks = 1, completed = 1
+    expect(tree.getCounts()).toEqual({ total: 1, completed: 1 });
+    expect(tree.getCompletionString()).toBe('Complete 100% (1/1)');
+  });
+
+  test('should throw an error when adding subtask to non-existent parent', () => {
+    const existing: ParsedTaskNode = { completed: false, children: [] };
+    const nonExistent: ParsedTaskNode = { completed: false, children: [] };
+    const tree = new TaskTree([existing]);
+    const subtask: ParsedTaskNode = { completed: false, children: [] };
+    expect(() => tree.addSubtask(nonExistent, subtask)).toThrow('Parent task not found');
+  });
 });
