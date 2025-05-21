@@ -24,6 +24,7 @@ export interface TaskCounts {
  */
 export class TaskTree {
     private rootNodes: ParsedTaskNode[];
+    private hasCycle: boolean = false;  // tracks if a cycle was detected
 
     /**
      * Constructs a TaskTree instance.
@@ -41,22 +42,33 @@ export class TaskTree {
      * @param node The task node to process.
      * @returns TaskCounts for the given node and its descendants.
      */
-    protected processNode(node: ParsedTaskNode): TaskCounts {
+    protected processNode(node: ParsedTaskNode, visited: Set<ParsedTaskNode> = new Set()): TaskCounts {
+        // Detect cycle
+        if (visited.has(node)) {
+            this.hasCycle = true;
+            return { total: 0, completed: 0 };
+        }
+        visited.add(node);
         if (!node.children || node.children.length === 0) {
             // Leaf node: counts as 1 task.
-            return {
+            const counts = {
                 total: 1,
                 completed: node.completed ? 1 : 0,
             };
+            // remove node from visited after processing leaf
+            visited.delete(node);
+            return counts;
         } else {
             // Parent node: its count is the sum of its children's counts.
             let childTotalTasks = 0;
             let childCompletedTasks = 0;
             for (const child of node.children) {
-                const result = this.processNode(child);
+                const result = this.processNode(child, visited);
                 childTotalTasks += result.total;
                 childCompletedTasks += result.completed;
             }
+            // remove node from visited for other branches
+            visited.delete(node);
             return {
                 total: childTotalTasks,
                 completed: childCompletedTasks,
@@ -69,6 +81,8 @@ export class TaskTree {
      * @returns TaskCounts for all tasks in the tree.
      */
     public getCounts(): TaskCounts {
+        // reset cycle flag before counting
+        this.hasCycle = false;
         let totalTasks = 0;
         let completedTasks = 0;
 
@@ -88,12 +102,15 @@ export class TaskTree {
      */
     public getCompletionString(): string {
         const counts = this.getCounts();
+        let result: string;
         if (counts.total === 0) {
-            return "No tasks";
+            result = "No tasks";
+        } else {
+            const percentage = Math.round((counts.completed / counts.total) * 100);
+            result = `Complete ${percentage}% (${counts.completed}/${counts.total})`;
         }
-        const percentage = Math.round((counts.completed / counts.total) * 100);
-        let result = `Complete ${percentage}% (${counts.completed}/${counts.total})`;
-        if (this.hasMalformed()) {
+        // Append error icon if malformed or cycle detected
+        if (this.hasMalformed() || this.hasCycle) {
             result += ' ❗';
         }
         return result;

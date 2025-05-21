@@ -7,6 +7,14 @@ import { ParsedTaskNode, TaskTree } from './task-tree';
  */
 export class TaskTreeBuilder {
   private cache = new Set<string>();
+  private rootDir: string;
+
+  /**
+   * @param rootDir Base directory for resolving relative paths (e.g., vault root in Obsidian).
+   */
+  constructor(rootDir?: string) {
+    this.rootDir = rootDir || process.cwd();
+  }
 
   /**
    * Builds a TaskTree for the given markdown file path.
@@ -15,7 +23,7 @@ export class TaskTreeBuilder {
   public buildFromFile(filePath: string): TaskTree {
     const absPath = path.isAbsolute(filePath)
       ? filePath
-      : path.resolve(process.cwd(), filePath);
+      : path.resolve(this.rootDir, filePath);
     if (!fs.existsSync(absPath)) {
       throw new Error(`File not found: ${absPath}`);
     }

@@ -87,4 +87,27 @@ describe('TaskTree', () => {
     expect(tree.getCounts()).toEqual({ total: 1, completed: 1 });
     expect(tree.getCompletionString()).toBe('Complete 100% (1/1) ❗');
   });
+
+  describe('cyclic task trees', () => {
+    test('should detect direct cycle and mark with error icon', () => {
+      const node: ParsedTaskNode = { completed: false, children: [] };
+      // create direct cycle
+      node.children.push(node);
+      const tree = new TaskTree([node]);
+      // counts should be zero due to cycle abort
+      expect(tree.getCounts()).toEqual({ total: 0, completed: 0 });
+      expect(tree.getCompletionString()).toBe('No tasks ❗');
+    });
+
+    test('should detect indirect cycle and mark with error icon', () => {
+      const nodeA: ParsedTaskNode = { completed: false, children: [] };
+      const nodeB: ParsedTaskNode = { completed: true, children: [] };
+      // create indirect cycle A -> B -> A
+      nodeA.children.push(nodeB);
+      nodeB.children.push(nodeA);
+      const tree = new TaskTree([nodeA]);
+      expect(tree.getCounts()).toEqual({ total: 0, completed: 0 });
+      expect(tree.getCompletionString()).toBe('No tasks ❗');
+    });
+  });
 });
