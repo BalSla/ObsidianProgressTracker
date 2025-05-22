@@ -36,6 +36,13 @@ describe('TaskTreeBuilder', () => {
     expect(tree.getCompletionString()).toBe('Complete 67% (2/3)');
   });
 
+  test('ignores non-Obsidian markdown links within tasks', () => {
+    const file = __dirname + '/fixtures/markdown-link.md';
+    const tree = builder.buildFromFile(file);
+    expect(tree.getCounts()).toEqual({ total: 2, completed: 1 });
+    expect(tree.getCompletionString()).toBe('Complete 50% (1/2)');
+  });
+
   describe('cyclic task trees', () => {
     test('detects self-link cycle and marks with error icon', () => {
       const file = __dirname + '/fixtures/cyclic-self.md';

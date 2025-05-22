@@ -1,0 +1,2 @@
+- [ ] Task with a normal markdown link [Google](https://google.com)
+- [x] Another task with link [Example](example.md)
