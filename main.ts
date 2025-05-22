@@ -20,10 +20,16 @@ import { TaskTreeBuilder } from './src/task-tree-builder';
 
 interface MyPluginSettings {
     mySetting: string;
+    inlineFieldName: string;
+    representation: string;
+    ignoreTag: string;
 }
 
 const DEFAULT_SETTINGS: MyPluginSettings = {
-    mySetting: 'default'
+    mySetting: 'default',
+    inlineFieldName: 'COMPLETE',
+    representation: 'Complete {percentage}% ({completed}/{total})',
+    ignoreTag: 'ignoretasktree',
 }
 
 export default class MyPlugin extends Plugin {
@@ -49,9 +55,11 @@ export default class MyPlugin extends Plugin {
         this.registerMarkdownPostProcessor((element, context) => {
             // Determine vault root directory for resolving links
             const vaultRoot = (this.app.vault.adapter as any).basePath;
-            const builder = new TaskTreeBuilder(vaultRoot);
+            const builder = new TaskTreeBuilder(vaultRoot, this.settings.ignoreTag);
+            const fieldName = this.settings.inlineFieldName;
+            const template = this.settings.representation;
             element.querySelectorAll("p").forEach(p => {
-                const regex = /COMPLETE:\[\[([^\]]*)\]\]/g;
+                const regex = new RegExp(`${fieldName}:\\[\\[([^\\]]*)\\]\\]`, 'g');
                 let html = p.innerHTML;
                 html = html.replace(regex, (match, linkName) => {
                     let filePath: string;
@@ -60,21 +68,34 @@ export default class MyPlugin extends Plugin {
                         const filename = linkName.endsWith('.md') ? linkName : `${linkName}.md`;
                         filePath = dir ? `${dir}/${filename}` : filename;
                     } else if (context.sourcePath) {
-                        console.log("No link name, using source path:", context.sourcePath);
                         filePath = context.sourcePath;
                         const tree = builder.buildFromFile(filePath);
                         return `<span class="completed-task-reading">${tree.getCompletionString()}</span>`;
                     } else {
-                        console.log("No link name, using source path:", context.sourcePath);
                         filePath = context.sourcePath;
                         const tree = builder.buildFromFile(filePath);
                         return `<span class="completed-task-reading">${tree.getCompletionString()}</span>`;
                     }
                     try {
                         const tree = builder.buildFromFile(filePath);
-                        return `<span class="completed-task-reading">${tree.getCompletionString()}</span>`;
+                        const counts = tree.getCounts();
+                        const rawString = tree.getCompletionString();
+                        let display: string;
+                        if (counts.total === 0) {
+                            display = rawString;
+                        } else {
+                            const percentage = Math.round((counts.completed / counts.total) * 100);
+                            display = template
+                                .replace('{completed}', `${counts.completed}`)
+                                .replace('{total}', `${counts.total}`)
+                                .replace('{percentage}', `${percentage}`);
+                            if (rawString.endsWith(' ❗')) {
+                                display += ' ❗';
+                            }
+                        }
+                        return `<span class="completed-task-reading">${display}</span>`;
                     } catch (error) {
-                        return '<span class="completed-task-reading">No tasks</span>';
+                        return `<span class="completed-task-reading">No tasks</span>`;
                     }
                 });
                 p.innerHTML = html;
@@ -113,9 +134,10 @@ export default class MyPlugin extends Plugin {
         const completeTaskPlugin = ViewPlugin.fromClass(
             class {
                 decorations: DecorationSet;
-                regex = /COMPLETE:\[\[([^\]]*)\]\]/g; // Capture link name
+                regex: RegExp;
 
                 constructor(view: EditorView) {
+                    this.regex = new RegExp(`${plugin.settings.inlineFieldName}:\\[\\[([^\\]]*)\\]\\]`, 'g');
                     this.decorations = this.buildDecorations(view);
                 }
 
@@ -133,7 +155,7 @@ export default class MyPlugin extends Plugin {
                     }
                     const sourcePath = (field as any).sourcePath;
                     const vaultRoot = (plugin.app.vault.adapter as any).basePath;
-                    const treeBuilder = new TaskTreeBuilder(vaultRoot);
+                    const treeBuilder = new TaskTreeBuilder(vaultRoot, plugin.settings.ignoreTag);
                     for (const { from, to } of view.visibleRanges) {
                         const text = view.state.doc.sliceString(from, to);
                         let match;
@@ -162,7 +184,20 @@ export default class MyPlugin extends Plugin {
                             let displayText: string;
                             try {
                                 const tree = treeBuilder.buildFromFile(filePath);
-                                displayText = tree.getCompletionString();
+                                const counts = tree.getCounts();
+                                const rawString = tree.getCompletionString();
+                                if (counts.total === 0) {
+                                    displayText = rawString;
+                                } else {
+                                    const percentage = Math.round((counts.completed / counts.total) * 100);
+                                    displayText = plugin.settings.representation
+                                        .replace('{completed}', `${counts.completed}`)
+                                        .replace('{total}', `${counts.total}`)
+                                        .replace('{percentage}', `${percentage}`);
+                                    if (rawString.endsWith(' ❗')) {
+                                        displayText += ' ❗';
+                                    }
+                                }
                             } catch {
                                 displayText = 'No tasks';
                             }
@@ -200,15 +235,12 @@ export default class MyPlugin extends Plugin {
 
     // Handler for file modifications
     private handleFileModify(file: TFile) {
-        console.log('File modified:', file.path);
         const modifiedPath = file.path;
 
         const backlinks = findBacklinkSources(modifiedPath);
 
         for (const sourceFilePath of backlinks) {
-            console.log('Backlink source file:', sourceFilePath);
             const file = this.app.vault.getAbstractFileByPath(sourceFilePath);
-            console.log('Looking for file opened in view:', file);
             const leaves = this.app.workspace.getLeavesOfType("markdown");
             for (const leaf of leaves) {
                 if (leaf.view instanceof MarkdownView && leaf.view.file === file) {
@@ -232,32 +264,53 @@ function findBacklinkSources(targetPath: string): string[] {
       }
     }
   }
-    console.log('Backlink sources:', sources);
   return sources;
 }
 
 class SampleSettingTab extends PluginSettingTab {
-    plugin: MyPlugin;
+     plugin: MyPlugin;
 
-    constructor(app: App, plugin: MyPlugin) {
-        super(app, plugin);
-        this.plugin = plugin;
-    }
+     constructor(app: App, plugin: MyPlugin) {
+         super(app, plugin);
+         this.plugin = plugin;
+     }
 
-    display(): void {
-        const { containerEl } = this;
+     display(): void {
+         const { containerEl } = this;
 
-        containerEl.empty();
+         containerEl.empty();
 
-        new Setting(containerEl)
-            .setName('Setting #1')
-            .setDesc('It\'s a secret')
-            .addText(text => text
-                .setPlaceholder('Enter your secret')
-                .setValue(this.plugin.settings.mySetting)
-                .onChange(async (value) => {
-                    this.plugin.settings.mySetting = value;
-                    await this.plugin.saveSettings();
-                }));
+         new Setting(containerEl)
+             .setName('Inline Field Name')
+             .setDesc('The name of the inline field tag (e.g., COMPLETE)')
+             .addText(text => text
+                 .setPlaceholder('Enter inline field name')
+                 .setValue(this.plugin.settings.inlineFieldName)
+                 .onChange(async (value: string) => {
+                     this.plugin.settings.inlineFieldName = value;
+                     await this.plugin.saveSettings();
+                 }));
+
+         new Setting(containerEl)
+             .setName('Representation Template')
+             .setDesc('Template for display using {completed}, {total}, and {percentage}')
+             .addText(text => text
+                 .setPlaceholder('e.g., Complete {percentage}% ({completed}/{total})')
+                 .setValue(this.plugin.settings.representation)
+                 .onChange(async (value: string) => {
+                     this.plugin.settings.representation = value;
+                     await this.plugin.saveSettings();
+                 }));
+
+         new Setting(containerEl)
+             .setName('Ignore Tag')
+             .setDesc('Tag to ignore pages (without #), e.g., ignoretasktree')
+             .addText(text => text
+                 .setPlaceholder('Enter ignore tag')
+                 .setValue(this.plugin.settings.ignoreTag)
+                 .onChange(async (value: string) => {
+                     this.plugin.settings.ignoreTag = value;
+                     await this.plugin.saveSettings();
+                 }));
     }
 }

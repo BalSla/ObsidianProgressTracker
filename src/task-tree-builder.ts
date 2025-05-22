@@ -31,14 +31,16 @@ class BuilderTaskTree extends TaskTree {
 export class TaskTreeBuilder {
   private cache = new Set<string>();
   private rootDir: string;
+  private ignoreTag: string;
   private hasFileCycle: boolean = false;  // flag for cycle in page links
   private fileStack: string[] = [];  // track current file recursion stack
 
   /**
    * @param rootDir Base directory for resolving relative paths (e.g., vault root in Obsidian).
    */
-  constructor(rootDir?: string) {
+  constructor(rootDir?: string, ignoreTag: string = 'ignoretasktree') {
     this.rootDir = rootDir || process.cwd();
+    this.ignoreTag = ignoreTag;
   }
 
   /**
@@ -67,7 +69,7 @@ export class TaskTreeBuilder {
 
     const content = fs.readFileSync(absPath, 'utf-8');
     // ignore pages tagged to skip task tree
-    if (content.includes('#ignoretasktree')) {
+    if (content.includes(`#${this.ignoreTag}`)) {
       this.fileStack.pop();
       return new BuilderTaskTree([], false);
     }
