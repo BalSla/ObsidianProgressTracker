@@ -27,4 +27,35 @@ describe('TaskTreeBuilder', () => {
     expect(tree.getCounts()).toEqual({ total: 1, completed: 0 });
     expect(tree.getCompletionString()).toBe('Complete 0% (0/1)');
   });
+
+  test('handles pipe-alias links [[page|alias]] to include page tasks', () => {
+    const file = __dirname + '/fixtures/alias-link.md';
+    const tree = builder.buildFromFile(file);
+    // alias link to subpage.md should include its 3 tasks (2 completed)
+    expect(tree.getCounts()).toEqual({ total: 3, completed: 2 });
+    expect(tree.getCompletionString()).toBe('Complete 67% (2/3)');
+  });
+
+  describe('cyclic task trees', () => {
+    test('detects self-link cycle and marks with error icon', () => {
+      const file = __dirname + '/fixtures/cyclic-self.md';
+      const tree = builder.buildFromFile(file);
+      expect(tree.getCounts()).toEqual({ total: 0, completed: 0 });
+      expect(tree.getCompletionString()).toBe('No tasks ❗');
+    });
+
+    test('detects indirect link cycle and marks with error icon', () => {
+      const file = __dirname + '/fixtures/cyclic-A.md';
+      const tree = builder.buildFromFile(file);
+      expect(tree.getCounts()).toEqual({ total: 0, completed: 0 });
+      expect(tree.getCompletionString()).toBe('No tasks ❗');
+    });
+
+      test('detects indirect link (pipe-styled) cycle and marks with error icon', () => {
+      const file = __dirname + '/fixtures/alias-link-pipe.md';
+      const tree = builder.buildFromFile(file);
+      expect(tree.getCounts()).toEqual({ total: 0, completed: 0 });
+      expect(tree.getCompletionString()).toBe('No tasks ❗');
+    });
+  });
 });

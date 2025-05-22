@@ -2,12 +2,37 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { ParsedTaskNode, TaskTree } from './task-tree';
 
+// Subclass TaskTree to override completion string based on file link cycles
+class BuilderTaskTree extends TaskTree {
+  constructor(rootNodes: ParsedTaskNode[], private fileHasCycle: boolean) {
+    super(rootNodes);
+  }
+  public getCounts(): import('./task-tree').TaskCounts {
+    // Return zeros if a page-link cycle was detected
+    if (this.fileHasCycle) {
+      return { total: 0, completed: 0 };
+    }
+    return super.getCounts();
+  }
+  public getCompletionString(): string {
+    // Delegate to base implementation
+    const base = super.getCompletionString();
+    // Append error icon if file-level cycle detected
+    if (this.fileHasCycle && !base.endsWith(' ❗')) {
+      return base + ' ❗';
+    }
+    return base;
+  }
+}
+
 /**
  * Builds a TaskTree from an Obsidian markdown page by parsing tasks and recursively including linked pages.
  */
 export class TaskTreeBuilder {
   private cache = new Set<string>();
   private rootDir: string;
+  private hasFileCycle: boolean = false;  // flag for cycle in page links
+  private fileStack: string[] = [];  // track current file recursion stack
 
   /**
    * @param rootDir Base directory for resolving relative paths (e.g., vault root in Obsidian).
@@ -24,6 +49,13 @@ export class TaskTreeBuilder {
     const absPath = path.isAbsolute(filePath)
       ? filePath
       : path.resolve(this.rootDir, filePath);
+    // detect root invocation to reset state
+    const isRootCall = this.fileStack.length === 0;
+    if (isRootCall) {
+      this.cache.clear();
+      this.hasFileCycle = false;
+      this.fileStack = [];
+    }
     if (!fs.existsSync(absPath)) {
       throw new Error(`File not found: ${absPath}`);
     }
@@ -31,11 +63,15 @@ export class TaskTreeBuilder {
       return new TaskTree([]);
     }
     this.cache.add(absPath);
+    this.fileStack.push(absPath);
 
     const content = fs.readFileSync(absPath, 'utf-8');
     const lines = content.split(/\r?\n/);
     const nodes = this.parseLines(lines, path.dirname(absPath));
-    return new TaskTree(nodes);
+    this.fileStack.pop();
+    // Use BuilderTaskTree to reflect file link cycle in completion string
+    const tree = new BuilderTaskTree(nodes, isRootCall && this.hasFileCycle);
+    return tree;
   }
 
   /**
@@ -57,16 +93,28 @@ export class TaskTreeBuilder {
       const text = match[3];
       const node: ParsedTaskNode = { completed, children: [] };
 
-      // Handle linked pages: [[PageName]]
+      // Handle Obsidian links: [[PageName]] or [[PageName|Alias]]
       const linkMatch = /\[\[([^\]]+)\]\]/.exec(text);
       if (linkMatch) {
-        const linkName = linkMatch[1];
-        const linkPath = path.resolve(currentDir, `${linkName}.md`);
+        // extract actual page name before any pipe alias
+        const rawLink = linkMatch[1];
+        const pageName = rawLink.split('|')[0].trim();
+        // preserve .md extension if present
+        const fileName = pageName.toLowerCase().endsWith('.md') ? pageName : `${pageName}.md`;
+        const linkPath = path.resolve(currentDir, fileName);
         if (fs.existsSync(linkPath)) {
-          const subtree = this.buildFromFile(linkPath);
-          // Use private API of TaskTree to extract root nodes via reflection
-          // @ts-ignore
-          node.children = subtree['rootNodes'] || [];
+          // detect page link cycles by checking recursion stack
+          if (this.fileStack.includes(linkPath)) {
+            // set file-level cycle flag
+            this.hasFileCycle = true;
+            // create self-cycle to trigger TaskTree cycle detection if needed
+            node.children = [node];
+          } else {
+            const subtree = this.buildFromFile(linkPath);
+            // Use private API of TaskTree to extract root nodes via reflection
+            // @ts-ignore
+            node.children = subtree['rootNodes'] || [];
+          }
         }
       }
 
