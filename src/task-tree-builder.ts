@@ -66,6 +66,11 @@ export class TaskTreeBuilder {
     this.fileStack.push(absPath);
 
     const content = fs.readFileSync(absPath, 'utf-8');
+    // ignore pages tagged to skip task tree
+    if (content.includes('#ignoretasktree')) {
+      this.fileStack.pop();
+      return new BuilderTaskTree([], false);
+    }
     const lines = content.split(/\r?\n/);
     const nodes = this.parseLines(lines, path.dirname(absPath));
     this.fileStack.pop();

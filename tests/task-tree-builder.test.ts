@@ -65,4 +65,18 @@ describe('TaskTreeBuilder', () => {
       expect(tree.getCompletionString()).toBe('No tasks ❗');
     });
   });
+
+  test('skips pages tagged with #ignoretasktree', () => {
+    const file = __dirname + '/fixtures/ignore-tasktree.md';
+    const tree = builder.buildFromFile(file);
+    expect(tree.getCounts()).toEqual({ total: 0, completed: 0 });
+    expect(tree.getCompletionString()).toBe('No tasks');
+  });
+  test('skips pages tagged with #ignoretasktree', () => {
+    const file = __dirname + '/fixtures/ignore-tasktree-start.md';
+    const tree = builder.buildFromFile(file);
+    expect(tree.getCounts()).toEqual({ total: 1, completed: 0 });
+    expect(tree.getCompletionString()).toBe('Complete 0% (0/1)');
+  });
+
 });
