@@ -79,4 +79,18 @@ describe('TaskTreeBuilder', () => {
     expect(tree.getCompletionString()).toBe('Complete 0% (0/1)');
   });
 
+  test('build tree from page with multiple separate lists', () => {
+    const file = __dirname + '/fixtures/multi.md';
+    const tree = builder.buildFromFile(file);
+    expect(tree.getCounts()).toEqual({ total: 4, completed: 2 });
+    expect(tree.getCompletionString()).toBe('Complete 50% (2/4)');
+  });
+
+  test('includes all tasks from linked page with multiple lists', () => {
+    const file = __dirname + '/fixtures/multi-link.md';
+    const tree = builder.buildFromFile(file);
+    expect(tree.getCounts()).toEqual({ total: 5, completed: 2 });
+    expect(tree.getCompletionString()).toBe('Complete 40% (2/5)');
+  });
+
 });
