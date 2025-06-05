@@ -237,7 +237,7 @@ export default class MyPlugin extends Plugin {
     private handleFileModify(file: TFile) {
         const modifiedPath = file.path;
 
-        const backlinks = findBacklinkSources(modifiedPath);
+        const backlinks = findBacklinkSources(this.app, modifiedPath);
 
         for (const sourceFilePath of backlinks) {
             const file = this.app.vault.getAbstractFileByPath(sourceFilePath);
@@ -251,8 +251,8 @@ export default class MyPlugin extends Plugin {
     }
 }
 
-function findBacklinkSources(targetPath: string): string[] {
-  const backlinks = this.app.metadataCache.resolvedLinks;
+function findBacklinkSources(app: App, targetPath: string): string[] {
+  const backlinks = app.metadataCache.resolvedLinks;
   const sources: string[] = [];
 
   for (const [sourcePath, targets] of Object.entries(backlinks)) {
