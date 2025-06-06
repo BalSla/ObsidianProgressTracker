@@ -15,6 +15,7 @@ import { ViewPlugin, Decoration, DecorationSet, ViewUpdate, WidgetType, EditorVi
 import { syntaxTree } from '@codemirror/language';
 import { SyntaxNode } from '@lezer/common';
 import { TaskTreeBuilder } from './src/task-tree-builder';
+import { updateParentStatuses } from './src/auto-parent';
 
 // Remember to rename these classes and interfaces!
 
@@ -34,6 +35,8 @@ const DEFAULT_SETTINGS: MyPluginSettings = {
 
 export default class MyPlugin extends Plugin {
     settings: MyPluginSettings;
+    private fileStates: Map<string, Map<number, boolean>> = new Map();
+    private skipModify = false;
 
     async onload() {
         await this.loadSettings();
@@ -234,19 +237,47 @@ export default class MyPlugin extends Plugin {
     }
 
     // Handler for file modifications
-    private handleFileModify(file: TFile) {
+    private async handleFileModify(file: TFile) {
+        if (this.skipModify) {
+            this.skipModify = false;
+            return;
+        }
+
         const modifiedPath = file.path;
 
-        const backlinks = findBacklinkSources(this.app, modifiedPath);
+        const root = (this.app.vault.adapter as any).basePath;
+        const visited = new Set<string>();
+        await this.updateFileAndBacklinks(modifiedPath, visited, root);
+    }
 
-        for (const sourceFilePath of backlinks) {
-            const file = this.app.vault.getAbstractFileByPath(sourceFilePath);
-            const leaves = this.app.workspace.getLeavesOfType("markdown");
-            for (const leaf of leaves) {
-                if (leaf.view instanceof MarkdownView && leaf.view.file === file) {
-                    leaf.view.previewMode.rerender(true);
-                }
+    private async updateFileAndBacklinks(path: string, visited: Set<string>, root: string) {
+        if (visited.has(path)) return;
+        visited.add(path);
+        const abstract = this.app.vault.getAbstractFileByPath(path);
+        if (!(abstract instanceof TFile)) return;
+        try {
+            const content = await this.app.vault.read(abstract);
+            const prev = this.fileStates.get(path);
+            const result = updateParentStatuses(content, prev, path, root);
+            this.fileStates.set(path, result.state);
+            if (result.content !== content) {
+                this.skipModify = true;
+                await this.app.vault.modify(abstract, result.content);
             }
+        } catch (e) {
+            console.error(e);
+        }
+
+        const leaves = this.app.workspace.getLeavesOfType("markdown");
+        for (const leaf of leaves) {
+            if (leaf.view instanceof MarkdownView && leaf.view.file?.path === path) {
+                leaf.view.previewMode.rerender(true);
+            }
+        }
+
+        const backlinks = findBacklinkSources(this.app, path);
+        for (const source of backlinks) {
+            await this.updateFileAndBacklinks(source, visited, root);
         }
     }
 }
