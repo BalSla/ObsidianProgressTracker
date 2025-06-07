@@ -258,7 +258,7 @@ export default class MyPlugin extends Plugin {
         try {
             const content = await this.app.vault.read(abstract);
             const prev = this.fileStates.get(path);
-            const result = updateParentStatuses(content, prev, path, root);
+            const result = updateParentStatuses(content, prev, path, root, this.settings.ignoreTag);
             this.fileStates.set(path, result.state);
             if (result.content !== content) {
                 this.skipModify = true;

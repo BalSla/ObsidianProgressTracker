@@ -55,6 +55,9 @@ function parseTasks(
           : `${pageName}.md`;
         const linkPath = path.resolve(currentDir, fileName);
         if (fs.existsSync(linkPath)) {
+          if (builder.shouldIgnoreFile(linkPath)) {
+            continue;
+          }
           try {
             const tree = builder.buildFromFile(linkPath);
             const counts = tree.getCounts();
@@ -91,14 +94,15 @@ export function updateParentStatuses(
   content: string,
   prevState?: Map<number, boolean>,
   filePath?: string,
-  rootDir?: string
+  rootDir?: string,
+  ignoreTag: string = 'ignoretasktree'
 ): UpdateResult {
   const lines = content.split(/\r?\n/);
   let builder: TaskTreeBuilder | undefined = undefined;
   let dir: string | undefined = undefined;
   if (filePath && rootDir) {
     dir = path.dirname(path.isAbsolute(filePath) ? filePath : path.resolve(rootDir, filePath));
-    builder = new TaskTreeBuilder(rootDir);
+    builder = new TaskTreeBuilder(rootDir, ignoreTag);
   }
   const tasks = parseTasks(lines, dir, builder);
 

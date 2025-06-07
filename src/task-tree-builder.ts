@@ -44,6 +44,20 @@ export class TaskTreeBuilder {
   }
 
   /**
+   * Returns true if the given file contains the ignore tag.
+   */
+  public shouldIgnoreFile(filePath: string): boolean {
+    const absPath = path.isAbsolute(filePath)
+      ? filePath
+      : path.resolve(this.rootDir, filePath);
+    if (!fs.existsSync(absPath)) {
+      return false;
+    }
+    const content = fs.readFileSync(absPath, 'utf-8');
+    return content.includes(`#${this.ignoreTag}`);
+  }
+
+  /**
    * Builds a TaskTree for the given markdown file path.
    * @param filePath Relative or absolute path to the markdown file.
    */

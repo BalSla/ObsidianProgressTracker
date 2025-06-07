@@ -18,4 +18,11 @@ describe('updateParentStatuses with links', () => {
     const result = updateParentStatuses(content, undefined, filePath, root);
     expect(result.content.trim()).toBe('- [ ] Parent Task [[subpage]]');
   });
+
+  test('ignores linked page with custom ignore tag', () => {
+    const filePath = path.join(root, 'ignore-custom-start.md');
+    const content = fs.readFileSync(filePath, 'utf8');
+    const result = updateParentStatuses(content, undefined, filePath, root, 'customignore');
+    expect(result.content.trim()).toBe('- [x] Parent Task [[ignore-custom]]');
+  });
 });
