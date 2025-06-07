@@ -70,14 +70,8 @@ export default class MyPlugin extends Plugin {
                         const dir = context.sourcePath ? context.sourcePath.replace(/\/[^/]+$/, '') : '';
                         const filename = linkName.endsWith('.md') ? linkName : `${linkName}.md`;
                         filePath = dir ? `${dir}/${filename}` : filename;
-                    } else if (context.sourcePath) {
-                        filePath = context.sourcePath;
-                        const tree = builder.buildFromFile(filePath);
-                        return `<span class="completed-task-reading">${tree.getCompletionString()}</span>`;
                     } else {
-                        filePath = context.sourcePath;
-                        const tree = builder.buildFromFile(filePath);
-                        return `<span class="completed-task-reading">${tree.getCompletionString()}</span>`;
+                        filePath = context.sourcePath ?? '';
                     }
                     try {
                         const tree = builder.buildFromFile(filePath);
