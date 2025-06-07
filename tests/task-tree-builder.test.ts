@@ -79,6 +79,14 @@ describe('TaskTreeBuilder', () => {
     expect(tree.getCompletionString()).toBe('Complete 0% (0/1)');
   });
 
+  test('skips pages tagged with custom ignore tag', () => {
+    const customBuilder = new TaskTreeBuilder(undefined, 'customignore');
+    const file = __dirname + '/fixtures/ignore-custom.md';
+    const tree = customBuilder.buildFromFile(file);
+    expect(tree.getCounts()).toEqual({ total: 0, completed: 0 });
+    expect(tree.getCompletionString()).toBe('No tasks');
+  });
+
   test('build tree from page with multiple separate lists', () => {
     const file = __dirname + '/fixtures/multi.md';
     const tree = builder.buildFromFile(file);
