@@ -18,6 +18,7 @@ main.js
 
 # obsidian
 data.json
+community-plugins.json
 
 # Exclude macOS Finder (System Explorer) View States
 .DS_Store
