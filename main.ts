@@ -2,8 +2,6 @@ import {
     App,
     Editor,
     MarkdownView,
-    Modal,
-    Notice,
     Plugin,
     PluginSettingTab,
     Setting,
@@ -12,8 +10,6 @@ import {
 import { editorLivePreviewField } from "obsidian"; // Required for CM6 editor extensions
 import { Extension, RangeSetBuilder } from '@codemirror/state';
 import { ViewPlugin, Decoration, DecorationSet, ViewUpdate, WidgetType, EditorView } from '@codemirror/view';
-import { syntaxTree } from '@codemirror/language';
-import { SyntaxNode } from '@lezer/common';
 import { TaskTreeBuilder } from './src/task-tree-builder';
 import { updateParentStatuses } from './src/auto-parent';
 
