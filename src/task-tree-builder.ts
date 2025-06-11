@@ -35,6 +35,11 @@ export class TaskTreeBuilder {
   private hasFileCycle: boolean = false;  // flag for cycle in page links
   private fileStack: string[] = [];  // track current file recursion stack
 
+  private isPathInsideRoot(p: string): boolean {
+    const rel = path.relative(this.rootDir, p);
+    return !rel.startsWith('..') && !path.isAbsolute(rel);
+  }
+
   /**
    * @param rootDir Base directory for resolving relative paths (e.g., vault root in Obsidian).
    */
@@ -50,6 +55,9 @@ export class TaskTreeBuilder {
     const absPath = path.isAbsolute(filePath)
       ? filePath
       : path.resolve(this.rootDir, filePath);
+    if (!this.isPathInsideRoot(absPath)) {
+      return false;
+    }
     if (!fs.existsSync(absPath)) {
       return false;
     }
@@ -65,6 +73,9 @@ export class TaskTreeBuilder {
     const absPath = path.isAbsolute(filePath)
       ? filePath
       : path.resolve(this.rootDir, filePath);
+    if (!this.isPathInsideRoot(absPath)) {
+      throw new Error(`Invalid path outside root: ${filePath}`);
+    }
     // detect root invocation to reset state
     const isRootCall = this.fileStack.length === 0;
     if (isRootCall) {
@@ -123,7 +134,7 @@ export class TaskTreeBuilder {
         // preserve .md extension if present
         const fileName = pageName.toLowerCase().endsWith('.md') ? pageName : `${pageName}.md`;
         const linkPath = path.resolve(currentDir, fileName);
-        if (fs.existsSync(linkPath)) {
+        if (this.isPathInsideRoot(linkPath) && fs.existsSync(linkPath)) {
           // detect page link cycles by checking recursion stack
           if (this.fileStack.includes(linkPath)) {
             // set file-level cycle flag

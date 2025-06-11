@@ -101,4 +101,13 @@ describe('TaskTreeBuilder', () => {
     expect(tree.getCompletionString()).toBe('Complete 40% (2/5)');
   });
 
+  test('ignores links that escape the vault root', () => {
+    const root = __dirname + '/fixtures';
+    const customBuilder = new TaskTreeBuilder(root);
+    const file = root + '/path-traversal.md';
+    const tree = customBuilder.buildFromFile(file);
+    expect(tree.getCounts()).toEqual({ total: 1, completed: 0 });
+    expect(tree.getCompletionString()).toBe('Complete 0% (0/1)');
+  });
+
 });
