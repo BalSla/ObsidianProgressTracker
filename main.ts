@@ -12,6 +12,7 @@ import { Extension, RangeSetBuilder } from '@codemirror/state';
 import { ViewPlugin, Decoration, DecorationSet, ViewUpdate, WidgetType, EditorView } from '@codemirror/view';
 import { TaskTreeBuilder } from './src/task-tree-builder';
 import { updateParentStatuses } from './src/auto-parent';
+import { escapeRegex } from './src/utils';
 
 // Remember to rename these classes and interfaces!
 
@@ -58,7 +59,7 @@ export default class MyPlugin extends Plugin {
             const fieldName = this.settings.inlineFieldName;
             const template = this.settings.representation;
             element.querySelectorAll("p").forEach(p => {
-                const regex = new RegExp(`${fieldName}:\\[\\[([^\\]]*)\\]\\]`, 'g');
+                const regex = new RegExp(`${escapeRegex(fieldName)}:\\[\\[([^\\]]*)\\]\\]`, 'g');
                 let html = p.innerHTML;
                 html = html.replace(regex, (match, linkName) => {
                     let filePath: string;
@@ -130,7 +131,7 @@ export default class MyPlugin extends Plugin {
                 regex: RegExp;
 
                 constructor(view: EditorView) {
-                    this.regex = new RegExp(`${plugin.settings.inlineFieldName}:\\[\\[([^\\]]*)\\]\\]`, 'g');
+                    this.regex = new RegExp(`${escapeRegex(plugin.settings.inlineFieldName)}:\\[\\[([^\\]]*)\\]\\]`, 'g');
                     this.decorations = this.buildDecorations(view);
                 }
 
