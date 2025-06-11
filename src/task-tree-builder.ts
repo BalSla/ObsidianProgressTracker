@@ -44,7 +44,8 @@ export class TaskTreeBuilder {
    * @param rootDir Base directory for resolving relative paths (e.g., vault root in Obsidian).
    */
   constructor(rootDir?: string, ignoreTag: string = 'ignoretasktree') {
-    this.rootDir = rootDir || process.cwd();
+    // Normalize and resolve the root directory so comparisons are reliable
+    this.rootDir = path.resolve(rootDir || process.cwd());
     this.ignoreTag = ignoreTag;
   }
 
@@ -70,21 +71,33 @@ export class TaskTreeBuilder {
    * @param filePath Relative or absolute path to the markdown file.
    */
   public buildFromFile(filePath: string): TaskTree {
-    const absPath = path.isAbsolute(filePath)
+    const resolved = path.isAbsolute(filePath)
       ? filePath
       : path.resolve(this.rootDir, filePath);
-    if (!this.isPathInsideRoot(absPath)) {
-      throw new Error(`Invalid path outside root: ${filePath}`);
-    }
-    // detect root invocation to reset state
+    const absPath = path.normalize(resolved);
+
+    const rel = path.relative(this.rootDir, absPath);
+    const outsideRoot = rel.startsWith('..') || path.isAbsolute(rel);
+
     const isRootCall = this.fileStack.length === 0;
     if (isRootCall) {
       this.cache.clear();
       this.hasFileCycle = false;
       this.fileStack = [];
     }
+
+    if (outsideRoot) {
+      if (isRootCall) {
+        throw new Error(`File outside rootDir: ${absPath}`);
+      }
+      return new TaskTree([]);
+    }
+
     if (!fs.existsSync(absPath)) {
-      throw new Error(`File not found: ${absPath}`);
+      if (isRootCall) {
+        throw new Error(`File not found: ${absPath}`);
+      }
+      return new TaskTree([]);
     }
     if (this.cache.has(absPath)) {
       return new TaskTree([]);

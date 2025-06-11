@@ -101,6 +101,13 @@ describe('TaskTreeBuilder', () => {
     expect(tree.getCompletionString()).toBe('Complete 40% (2/5)');
   });
 
+  test('does not traverse links outside root dir', () => {
+    const rootDir = __dirname + '/fixtures';
+    const customBuilder = new TaskTreeBuilder(rootDir);
+    const file = rootDir + '/outside-link.md';
+    const tree = customBuilder.buildFromFile(file);
+    expect(tree.getCounts()).toEqual({ total: 1, completed: 0 });
+     });
   test('ignores links that escape the vault root', () => {
     const root = __dirname + '/fixtures';
     const customBuilder = new TaskTreeBuilder(root);
