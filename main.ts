@@ -7,11 +7,13 @@ import {
     Setting,
     TFile      // added TFile
 } from 'obsidian';
+import * as path from 'path';
 import { editorLivePreviewField } from "obsidian"; // Required for CM6 editor extensions
 import { Extension, RangeSetBuilder } from '@codemirror/state';
 import { ViewPlugin, Decoration, DecorationSet, ViewUpdate, WidgetType, EditorView } from '@codemirror/view';
 import { TaskTreeBuilder } from './src/task-tree-builder';
 import { updateParentStatuses } from './src/auto-parent';
+import { escapeRegex } from './src/utils';
 
 // Remember to rename these classes and interfaces!
 
@@ -27,6 +29,16 @@ const DEFAULT_SETTINGS: MyPluginSettings = {
     inlineFieldName: 'COMPLETE',
     representation: 'Complete {percentage}% ({completed}/{total})',
     ignoreTag: 'ignoretasktree',
+};
+
+function resolveVaultPath(root: string, filePath: string): string | undefined {
+    const abs = path.resolve(root, filePath);
+    const rel = path.relative(root, abs);
+    if (rel.startsWith('..') || path.isAbsolute(rel)) {
+        console.warn(`Skipping invalid path outside vault: ${filePath}`);
+        return undefined;
+    }
+    return abs;
 }
 
 export default class MyPlugin extends Plugin {
@@ -58,7 +70,7 @@ export default class MyPlugin extends Plugin {
             const fieldName = this.settings.inlineFieldName;
             const template = this.settings.representation;
             element.querySelectorAll("p").forEach(p => {
-                const regex = new RegExp(`${fieldName}:\\[\\[([^\\]]*)\\]\\]`, 'g');
+                const regex = new RegExp(`${escapeRegex(fieldName)}:\\[\\[([^\\]]*)\\]\\]`, 'g');
                 let html = p.innerHTML;
                 html = html.replace(regex, (match, linkName) => {
                     let filePath: string;
@@ -69,8 +81,10 @@ export default class MyPlugin extends Plugin {
                     } else {
                         filePath = context.sourcePath ?? '';
                     }
+                    const resolved = resolveVaultPath(vaultRoot, filePath);
                     try {
-                        const tree = builder.buildFromFile(filePath);
+                        if (!resolved) throw new Error('invalid');
+                        const tree = builder.buildFromFile(resolved);
                         const counts = tree.getCounts();
                         const rawString = tree.getCompletionString();
                         let display: string;
@@ -130,7 +144,7 @@ export default class MyPlugin extends Plugin {
                 regex: RegExp;
 
                 constructor(view: EditorView) {
-                    this.regex = new RegExp(`${plugin.settings.inlineFieldName}:\\[\\[([^\\]]*)\\]\\]`, 'g');
+                    this.regex = new RegExp(`${escapeRegex(plugin.settings.inlineFieldName)}:\\[\\[([^\\]]*)\\]\\]`, 'g');
                     this.decorations = this.buildDecorations(view);
                 }
 
@@ -174,9 +188,11 @@ export default class MyPlugin extends Plugin {
                                const active = plugin.app.workspace.getActiveFile();
                                filePath = active?.path || '';
                            }
+                            const resolved = resolveVaultPath(vaultRoot, filePath);
                             let displayText: string;
                             try {
-                                const tree = treeBuilder.buildFromFile(filePath);
+                                if (!resolved) throw new Error('invalid');
+                                const tree = treeBuilder.buildFromFile(resolved);
                                 const counts = tree.getCounts();
                                 const rawString = tree.getCompletionString();
                                 if (counts.total === 0) {
