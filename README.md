@@ -20,6 +20,20 @@ if (tracker) {
   console.log(`Progress: ${percent}%`);
 }
 ```
+## Running Tests
+
+Before running the test suite for the first time, install all dependencies so
+that Jest and the TypeScript type definitions are available:
+
+```bash
+npm install
+```
+
+After the dependencies are installed, execute the tests with:
+
+```bash
+npm test
+```
 
 ## License
 
