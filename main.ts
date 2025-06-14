@@ -286,6 +286,27 @@ export default class MyPlugin extends Plugin {
             await this.updateFileAndBacklinks(source, visited, root);
         }
     }
+
+    /**
+     * Calculate the completion percentage for a note.
+     * Other plugins can call this method to obtain a page's progress.
+     *
+     * @param file A TFile instance or a vault-relative file path
+     * @returns Progress percentage rounded to the nearest whole number
+     */
+    public getPageProgress(file: TFile | string): number {
+        const vaultRoot = (this.app.vault.adapter as any).basePath;
+        const targetPath = typeof file === 'string' ? file : file.path;
+        const resolved = resolveVaultPath(vaultRoot, targetPath);
+        if (!resolved) {
+            throw new Error(`Invalid path: ${targetPath}`);
+        }
+        const builder = new TaskTreeBuilder(vaultRoot, this.settings.ignoreTag);
+        const tree = builder.buildFromFile(resolved);
+        const counts = tree.getCounts();
+        if (counts.total === 0) return 0;
+        return Math.round((counts.completed / counts.total) * 100);
+    }
 }
 
 function findBacklinkSources(app: App, targetPath: string): string[] {
