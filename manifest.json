@@ -1,7 +1,7 @@
 {
   "id": "progress-tracker-label",
   "name": "Progress Tracker",
-  "version": "1.4.2",
+  "version": "1.4.4",
   "minAppVersion": "0.15.0",
   "description": "Obsidian plugin that displays progress statistics inline by calculating the ratio of completed to incomplete tasks within task trees. It includes tasks from both the current note and any linked notes, offering insights like Complete 10% (10/100). Designed to integrate seamlessly via markdown post-processing, it avoids automatic parent task completion for full user control.",
   "author": "BalaSoft",
