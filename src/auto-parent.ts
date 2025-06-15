@@ -29,7 +29,9 @@ function parseTasks(
   ];
 
   for (let i = 0; i < lines.length; i++) {
-    const match = /^(\s*)- \[( |x|X)\](.*)$/.exec(lines[i]);
+    // Normalize tabs to 4 spaces for consistent indentation
+    const normalizedLine = lines[i].replace(/\t/g, '    ');
+    const match = /^(\s*)- \[( |x|X)\](.*)$/.exec(normalizedLine);
     if (!match) continue;
     const indent = match[1].length;
     const completed = match[2].toLowerCase() === 'x';
@@ -50,6 +52,7 @@ function parseTasks(
         hasLink = true;
         const rawLink = m[1];
         const pageName = rawLink.split('|')[0].trim();
+        if (!pageName) continue; // skip empty links
         const fileName = pageName.toLowerCase().endsWith('.md')
           ? pageName
           : `${pageName}.md`;
@@ -66,9 +69,7 @@ function parseTasks(
           } catch {
             allLinkComplete = false;
           }
-        } else {
-          allLinkComplete = false;
-        }
+        } // If file does not exist, treat as complete (do not block parent)
       }
       if (hasLink) {
         task.linkChildrenComplete = allLinkComplete;
@@ -97,14 +98,16 @@ export function updateParentStatuses(
   rootDir?: string,
   ignoreTag: string = 'ignoretasktree'
 ): UpdateResult {
-  const lines = content.split(/\r?\n/);
+  // Normalize tabs to 4 spaces in the content before splitting into lines
+  content = content.replace(/\t/g, '    ');
+  let lines = content.split(/\r?\n/);
   let builder: TaskTreeBuilder | undefined = undefined;
   let dir: string | undefined = undefined;
   if (filePath && rootDir) {
     dir = path.dirname(path.isAbsolute(filePath) ? filePath : path.resolve(rootDir, filePath));
     builder = new TaskTreeBuilder(rootDir, ignoreTag);
   }
-  const tasks = parseTasks(lines, dir, builder);
+  let tasks = parseTasks(lines, dir, builder);
 
   if (prevState) {
     for (const t of tasks) {
@@ -115,22 +118,56 @@ export function updateParentStatuses(
     }
   }
 
-  const sorted = tasks.slice().sort((a, b) => b.indent - a.indent);
-
-  for (const t of sorted) {
-    if (t.children.length === 0 && t.linkChildrenComplete === undefined) continue;
-    if (t.changed) continue; // skip manually changed parents
-    const childrenComplete = t.children.every((c) => c.completed);
-    const linksComplete = t.linkChildrenComplete ?? true;
-    const newVal = childrenComplete && linksComplete;
-    if (t.completed !== newVal) {
-      lines[t.line] = lines[t.line].replace(
-        /^(\s*- \[)( |x|X)(\])/,
-        `$1${newVal ? 'x' : ' '}$3`
-      );
-      t.completed = newVal;
+  let changed;
+  let loopCount = 0;
+  do {
+    changed = false;
+    const sorted = tasks.slice().sort((a, b) => b.indent - a.indent);
+    for (const t of sorted) {
+      console.log('Before update', {
+        line: t.line,
+        indent: t.indent,
+        completed: t.completed,
+        children: t.children.map(c => ({ line: c.line, completed: c.completed })),
+        changed: t.changed
+      });
+      if (t.children.length === 0 && t.linkChildrenComplete === undefined) continue;
+      if (t.changed) continue; // skip manually changed parents
+      const childrenComplete = t.children.every((c) => c.completed);
+      const linksComplete = t.linkChildrenComplete ?? true;
+      const newVal = childrenComplete && linksComplete;
+      if (t.completed !== newVal) {
+        lines[t.line] = lines[t.line].replace(
+          /^(\s*- \[)( |x|X)(\])/,
+          `$1${newVal ? 'x' : ' '}$3`
+        );
+        t.completed = newVal;
+        changed = true;
+        console.log('Updated line', t.line, lines[t.line]);
+      }
     }
-  }
+    // re-parse tasks to update parent/child relationships
+    const prevLines = lines.join('\n');
+    tasks = parseTasks(lines, dir, builder);
+    loopCount++;
+    if (changed) {
+      console.log('After update loop', loopCount, lines.join('\n'));
+      // Print all tasks after update
+      for (const t of tasks) {
+        console.log('Task after update', {
+          line: t.line,
+          indent: t.indent,
+          completed: t.completed,
+          children: t.children.map(c => ({ line: c.line, completed: c.completed })),
+          changed: t.changed
+        });
+      }
+    }
+    // If any line changed, force another loop
+    if (lines.join('\n') !== prevLines) {
+      changed = true;
+    }
+  } while (changed);
 
   const newState = new Map<number, boolean>();
   for (const t of tasks) {

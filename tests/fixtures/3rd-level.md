@@ -1,0 +1,4 @@
+- [ ] Explore map with [[empty link]]
+	- [ ] Test that scout explore map around the base
+		- [ ] 3rd level
+	- [x] Is it possible to manage exploration?. Yes.
