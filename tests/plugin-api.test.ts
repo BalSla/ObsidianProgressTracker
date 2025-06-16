@@ -20,7 +20,9 @@ const defaultSettings = {
 
 describe('ProgressTrackerLablePlugin.getPageProgress', () => {
   const fixtures = path.join(__dirname, 'fixtures');
-  const app = { vault: { adapter: new FileSystemAdapter(fixtures) } } as unknown as App;
+  const adapter = new FileSystemAdapter();
+  ;(adapter as any).basePath = fixtures;
+  const app = { vault: { adapter } } as unknown as App;
   const plugin = new ProgressTrackerLablePlugin(app, manifest as PluginManifest);
   plugin.settings = { ...defaultSettings };
 
