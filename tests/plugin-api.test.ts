@@ -1,5 +1,5 @@
 jest.mock('obsidian');
-import MyPlugin from '../main';
+import ProgressTrackerLablePlugin from '../main';
 import * as path from 'path';
 
 const manifest = {
@@ -17,10 +17,10 @@ const defaultSettings = {
   ignoreTag: 'ignoretasktree',
 };
 
-describe('MyPlugin.getPageProgress', () => {
+describe('ProgressTrackerLablePlugin.getPageProgress', () => {
   const fixtures = path.join(__dirname, 'fixtures');
   const app: any = { vault: { adapter: { basePath: fixtures } } };
-  const plugin = new MyPlugin(app, manifest as any);
+  const plugin = new ProgressTrackerLablePlugin(app, manifest as any);
   plugin.settings = { ...defaultSettings } as any;
 
   test('computes progress percentage for a note', () => {
