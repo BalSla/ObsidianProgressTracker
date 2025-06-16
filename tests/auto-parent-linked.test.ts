@@ -26,13 +26,21 @@ describe('updateParentStatuses with links', () => {
     expect(result.content.trim()).toBe('- [x] Parent Task [[ignore-custom]]');
   });
 
-  test('checks parent when all subtasks are complete and linked page does not have tasks', () => {
-    const filePath = path.join(root, 'main-linked-without-tasks.md');
+  test('checks parent when all subtasks are complete and linked page is not existin', () => {
     const content = `- [ ] 1st level [[page-without-tasks]]
     - [ ] 2nd level
         - [x] 3rd level
     - [x] completed task`;
-    const result = updateParentStatuses(content, undefined, filePath, root);
+    const result = updateParentStatuses(content, undefined, undefined, root);
     expect(result.content.split(/\r?\n/)[0]).toBe('- [x] 1st level [[page-without-tasks]]');
+  });
+
+    test('checks parent when all subtasks are complete and linked page does not have tasks', () => {
+    const content = `- [ ] 1st level [[no-tasks]]
+    - [ ] 2nd level
+        - [x] 3rd level
+    - [x] completed task`;
+    const result = updateParentStatuses(content, undefined, undefined, root);
+    expect(result.content.split(/\r?\n/)[0]).toBe('- [x] 1st level [[no-tasks]]');
   });
 });

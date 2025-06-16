@@ -47,6 +47,7 @@ function parseTasks(
       let hasLink = false;
       let allLinkComplete = true;
       for (const m of matches) {
+        console.log(`Found link: ${m[1]}`);
         hasLink = true;
         const rawLink = m[1];
         const pageName = rawLink.split('|')[0].trim();
@@ -61,8 +62,10 @@ function parseTasks(
           try {
             const tree = builder.buildFromFile(linkPath);
             const counts = tree.getCounts();
-            const complete = counts.total > 0 && counts.total === counts.completed;
-            if (!complete) allLinkComplete = false;
+            if (counts.total != 0) {
+              const complete = counts.total > 0 && counts.total === counts.completed;
+              if (!complete) allLinkComplete = false;
+            }
           } catch {
             allLinkComplete = false;
           }
