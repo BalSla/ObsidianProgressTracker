@@ -15,16 +15,15 @@ import { TaskTreeBuilder } from './src/task-tree-builder';
 import { updateParentStatuses } from './src/auto-parent';
 import { escapeRegex } from './src/utils';
 
-// Remember to rename these classes and interfaces!
 
-interface MyPluginSettings {
+interface ProgressTrackerLableSettings {
     mySetting: string;
     inlineFieldName: string;
     representation: string;
     ignoreTag: string;
 }
 
-const DEFAULT_SETTINGS: MyPluginSettings = {
+const DEFAULT_SETTINGS: ProgressTrackerLableSettings = {
     mySetting: 'default',
     inlineFieldName: 'COMPLETE',
     representation: 'Complete {percentage}% ({completed}/{total})',
@@ -41,8 +40,8 @@ function resolveVaultPath(root: string, filePath: string): string | undefined {
     return abs;
 }
 
-export default class MyPlugin extends Plugin {
-    settings: MyPluginSettings;
+export default class ProgressTrackerLablePlugin extends Plugin {
+    settings: ProgressTrackerLableSettings;
     private fileStates: Map<string, Map<number, boolean>> = new Map();
     private skipModify = false;
 
@@ -51,7 +50,7 @@ export default class MyPlugin extends Plugin {
 
         // This adds an editor command that can perform some operation on the current editor instance
         this.addCommand({
-            id: 'sample-editor-command',
+            id: 'sample-editor',
             name: 'Sample editor command',
             editorCallback: (editor: Editor, view: MarkdownView) => {
                 console.log(editor.getSelection());
@@ -60,7 +59,7 @@ export default class MyPlugin extends Plugin {
         });
 
         // This adds a settings tab so the user can configure various aspects of the plugin
-        this.addSettingTab(new SampleSettingTab(this.app, this));
+        this.addSettingTab(new ProgressTrackerLableSettingTab(this.app, this));
 
         // Reading View Processor
         this.registerMarkdownPostProcessor((element, context) => {
@@ -71,41 +70,63 @@ export default class MyPlugin extends Plugin {
             const template = this.settings.representation;
             element.querySelectorAll("p").forEach(p => {
                 const regex = new RegExp(`${escapeRegex(fieldName)}:\\[\\[([^\\]]*)\\]\\]`, 'g');
-                let html = p.innerHTML;
-                html = html.replace(regex, (match, linkName) => {
-                    let filePath: string;
-                    if (linkName && linkName.trim() !== '') {
-                        const dir = context.sourcePath ? context.sourcePath.replace(/\/[^/]+$/, '') : '';
-                        const filename = linkName.endsWith('.md') ? linkName : `${linkName}.md`;
-                        filePath = dir ? `${dir}/${filename}` : filename;
-                    } else {
-                        filePath = context.sourcePath ?? '';
-                    }
-                    const resolved = resolveVaultPath(vaultRoot, filePath);
-                    try {
-                        if (!resolved) throw new Error('invalid');
-                        const tree = builder.buildFromFile(resolved);
-                        const counts = tree.getCounts();
-                        const rawString = tree.getCompletionString();
-                        let display: string;
-                        if (counts.total === 0) {
-                            display = rawString;
+                const walker = document.createTreeWalker(p, NodeFilter.SHOW_TEXT);
+                const replacements: Array<{node: Text, frag: DocumentFragment}> = [];
+                let textNode: Text | null;
+                while ((textNode = walker.nextNode() as Text | null)) {
+                    const text = textNode.nodeValue || '';
+                    regex.lastIndex = 0;
+                    let match;
+                    let lastIndex = 0;
+                    const frag = document.createDocumentFragment();
+                    while ((match = regex.exec(text))) {
+                        const before = text.slice(lastIndex, match.index);
+                        if (before) frag.append(before);
+                        const linkName = match[1];
+                        let filePath: string;
+                        if (linkName && linkName.trim() !== '') {
+                            const dir = context.sourcePath ? context.sourcePath.replace(/\/[^/]+$/, '') : '';
+                            const filename = linkName.endsWith('.md') ? linkName : `${linkName}.md`;
+                            filePath = dir ? `${dir}/${filename}` : filename;
                         } else {
-                            const percentage = Math.round((counts.completed / counts.total) * 100);
-                            display = template
-                                .replace('{completed}', `${counts.completed}`)
-                                .replace('{total}', `${counts.total}`)
-                                .replace('{percentage}', `${percentage}`);
-                            if (rawString.endsWith(' ❗')) {
-                                display += ' ❗';
-                            }
+                            filePath = context.sourcePath ?? '';
                         }
-                        return `<span class="completed-task-reading">${display}</span>`;
-                    } catch (error) {
-                        return `<span class="completed-task-reading">No tasks</span>`;
+                        const resolved = resolveVaultPath(vaultRoot, filePath);
+                        let display: string;
+                        try {
+                            if (!resolved) throw new Error('invalid');
+                            const tree = builder.buildFromFile(resolved);
+                            const counts = tree.getCounts();
+                            const rawString = tree.getCompletionString();
+                            if (counts.total === 0) {
+                                display = rawString;
+                            } else {
+                                const percentage = Math.round((counts.completed / counts.total) * 100);
+                                display = template
+                                    .replace('{completed}', `${counts.completed}`)
+                                    .replace('{total}', `${counts.total}`)
+                                    .replace('{percentage}', `${percentage}`);
+                                if (rawString.endsWith(' ❗')) {
+                                    display += ' ❗';
+                                }
+                            }
+                        } catch {
+                            display = 'No tasks';
+                        }
+                        const span = document.createElement('span');
+                        span.addClass('completed-task-reading');
+                        span.setText(display);
+                        frag.append(span);
+                        lastIndex = match.index + match[0].length;
                     }
-                });
-                p.innerHTML = html;
+                    if (lastIndex === 0) continue;
+                    const after = text.slice(lastIndex);
+                    if (after) frag.append(after);
+                    replacements.push({node: textNode, frag});
+                }
+                for (const {node, frag} of replacements) {
+                    (node as any).replaceWith(frag);
+                }
             });
         });
 
@@ -325,10 +346,10 @@ function findBacklinkSources(app: App, targetPath: string): string[] {
   return sources;
 }
 
-class SampleSettingTab extends PluginSettingTab {
-     plugin: MyPlugin;
+class ProgressTrackerLableSettingTab extends PluginSettingTab {
+     plugin: ProgressTrackerLablePlugin;
 
-     constructor(app: App, plugin: MyPlugin) {
+     constructor(app: App, plugin: ProgressTrackerLablePlugin) {
          super(app, plugin);
          this.plugin = plugin;
      }
