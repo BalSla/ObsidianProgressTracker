@@ -25,4 +25,14 @@ describe('updateParentStatuses with links', () => {
     const result = updateParentStatuses(content, undefined, filePath, root, 'customignore');
     expect(result.content.trim()).toBe('- [x] Parent Task [[ignore-custom]]');
   });
+
+  test('checks parent when all subtasks are complete and linked page does not have tasks', () => {
+    const filePath = path.join(root, 'main-linked-without-tasks.md');
+    const content = `- [ ] 1st level [[page-without-tasks]]
+    - [ ] 2nd level
+        - [x] 3rd level
+    - [x] completed task`;
+    const result = updateParentStatuses(content, undefined, filePath, root);
+    expect(result.content.split(/\r?\n/)[0]).toBe('- [x] 1st level [[page-without-tasks]]');
+  });
 });

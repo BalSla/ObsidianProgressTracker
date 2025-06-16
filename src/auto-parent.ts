@@ -66,8 +66,6 @@ function parseTasks(
           } catch {
             allLinkComplete = false;
           }
-        } else {
-          allLinkComplete = false;
         }
       }
       if (hasLink) {
