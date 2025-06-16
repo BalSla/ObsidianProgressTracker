@@ -17,3 +17,8 @@ export class TFile { constructor(public path: string) {} }
 export class MarkdownView {}
 export class App { vault: any; workspace: any; metadataCache: any; constructor() {} }
 export const editorLivePreviewField = {};
+
+export class FileSystemAdapter {
+  constructor(private basePath: string) {}
+  getBasePath() { return this.basePath; }
+}

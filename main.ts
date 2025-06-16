@@ -5,7 +5,8 @@ import {
     Plugin,
     PluginSettingTab,
     Setting,
-    TFile      // added TFile
+    TFile,
+    FileSystemAdapter
 } from 'obsidian';
 import * as path from 'path';
 import { editorLivePreviewField } from "obsidian"; // Required for CM6 editor extensions
@@ -21,6 +22,10 @@ interface ProgressTrackerLableSettings {
     inlineFieldName: string;
     representation: string;
     ignoreTag: string;
+}
+
+interface SourcePathField {
+    sourcePath: string;
 }
 
 const DEFAULT_SETTINGS: ProgressTrackerLableSettings = {
@@ -64,7 +69,11 @@ export default class ProgressTrackerLablePlugin extends Plugin {
         // Reading View Processor
         this.registerMarkdownPostProcessor((element, context) => {
             // Determine vault root directory for resolving links
-            const vaultRoot = (this.app.vault.adapter as any).basePath;
+            let vaultRoot = '';
+            const adapter = this.app.vault.adapter;
+            if (adapter instanceof FileSystemAdapter) {
+                vaultRoot = adapter.getBasePath();
+            }
             const builder = new TaskTreeBuilder(vaultRoot, this.settings.ignoreTag);
             const fieldName = this.settings.inlineFieldName;
             const template = this.settings.representation;
@@ -125,7 +134,7 @@ export default class ProgressTrackerLablePlugin extends Plugin {
                     replacements.push({node: textNode, frag});
                 }
                 for (const {node, frag} of replacements) {
-                    (node as any).replaceWith(frag);
+                    node.replaceWith(frag);
                 }
             });
         });
@@ -181,8 +190,12 @@ export default class ProgressTrackerLablePlugin extends Plugin {
                     if (!field) {
                         return rangeBuilder.finish();
                     }
-                    const sourcePath = (field as any).sourcePath;
-                    const vaultRoot = (plugin.app.vault.adapter as any).basePath;
+                    const sourcePath = (field as unknown as SourcePathField).sourcePath;
+                    let vaultRoot = '';
+                    const adapter = plugin.app.vault.adapter;
+                    if (adapter instanceof FileSystemAdapter) {
+                        vaultRoot = adapter.getBasePath();
+                    }
                     const treeBuilder = new TaskTreeBuilder(vaultRoot, plugin.settings.ignoreTag);
                     for (const { from, to } of view.visibleRanges) {
                         const text = view.state.doc.sliceString(from, to);
@@ -272,7 +285,11 @@ export default class ProgressTrackerLablePlugin extends Plugin {
 
         const modifiedPath = file.path;
 
-        const root = (this.app.vault.adapter as any).basePath;
+        let root = '';
+        const adapter = this.app.vault.adapter;
+        if (adapter instanceof FileSystemAdapter) {
+            root = adapter.getBasePath();
+        }
         const visited = new Set<string>();
         await this.updateFileAndBacklinks(modifiedPath, visited, root);
     }
@@ -316,7 +333,11 @@ export default class ProgressTrackerLablePlugin extends Plugin {
      * @returns Progress percentage rounded to the nearest whole number
      */
     public getPageProgress(file: TFile | string): number {
-        const vaultRoot = (this.app.vault.adapter as any).basePath;
+        let vaultRoot = '';
+        const adapter = this.app.vault.adapter;
+        if (adapter instanceof FileSystemAdapter) {
+            vaultRoot = adapter.getBasePath();
+        }
         const targetPath = typeof file === 'string' ? file : file.path;
         const resolved = resolveVaultPath(vaultRoot, targetPath);
         if (!resolved) {
