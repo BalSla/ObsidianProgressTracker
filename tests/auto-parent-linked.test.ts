@@ -26,21 +26,23 @@ describe('updateParentStatuses with links', () => {
     expect(result.content.trim()).toBe('- [x] Parent Task [[ignore-custom]]');
   });
 
-  test('checks parent when all subtasks are complete and linked page is not existin', () => {
+  test('leaves parent unchecked when linked page is missing', () => {
     const content = `- [ ] 1st level [[page-without-tasks]]
     - [ ] 2nd level
         - [x] 3rd level
     - [x] completed task`;
-    const result = updateParentStatuses(content, undefined, undefined, root);
-    expect(result.content.split(/\r?\n/)[0]).toBe('- [x] 1st level [[page-without-tasks]]');
+    const filePath = path.join(root, 'dummy.md');
+    const result = updateParentStatuses(content, undefined, filePath, root);
+    expect(result.content.split(/\r?\n/)[0]).toBe('- [ ] 1st level [[page-without-tasks]]');
   });
 
-    test('checks parent when all subtasks are complete and linked page does not have tasks', () => {
+  test('leaves parent unchecked when linked page has no tasks', () => {
     const content = `- [ ] 1st level [[no-tasks]]
     - [ ] 2nd level
         - [x] 3rd level
     - [x] completed task`;
-    const result = updateParentStatuses(content, undefined, undefined, root);
-    expect(result.content.split(/\r?\n/)[0]).toBe('- [x] 1st level [[no-tasks]]');
+    const filePath = path.join(root, 'dummy.md');
+    const result = updateParentStatuses(content, undefined, filePath, root);
+    expect(result.content.split(/\r?\n/)[0]).toBe('- [ ] 1st level [[no-tasks]]');
   });
 });

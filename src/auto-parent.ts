@@ -46,31 +46,35 @@ function parseTasks(
       const matches = text.matchAll(linkRegex);
       let hasLink = false;
       let allLinkComplete = true;
-      for (const m of matches) {
-        console.log(`Found link: ${m[1]}`);
-        hasLink = true;
-        const rawLink = m[1];
-        const pageName = rawLink.split('|')[0].trim();
-        const fileName = pageName.toLowerCase().endsWith('.md')
-          ? pageName
-          : `${pageName}.md`;
-        const linkPath = path.resolve(currentDir, fileName);
-        if (fs.existsSync(linkPath)) {
-          if (builder.shouldIgnoreFile(linkPath)) {
-            continue;
-          }
-          try {
-            const tree = builder.buildFromFile(linkPath);
-            const counts = tree.getCounts();
-            if (counts.total != 0) {
-              const complete = counts.total > 0 && counts.total === counts.completed;
-              if (!complete) allLinkComplete = false;
+        for (const m of matches) {
+          console.log(`Found link: ${m[1]}`);
+          hasLink = true;
+          const rawLink = m[1];
+          const pageName = rawLink.split('|')[0].trim();
+          const fileName = pageName.toLowerCase().endsWith('.md')
+            ? pageName
+            : `${pageName}.md`;
+          const linkPath = path.resolve(currentDir, fileName);
+          if (fs.existsSync(linkPath)) {
+            if (builder.shouldIgnoreFile(linkPath)) {
+              continue;
             }
-          } catch {
+            try {
+              const tree = builder.buildFromFile(linkPath);
+              const counts = tree.getCounts();
+              if (counts.total === 0) {
+                allLinkComplete = false;
+              } else {
+                const complete = counts.total === counts.completed;
+                if (!complete) allLinkComplete = false;
+              }
+            } catch {
+              allLinkComplete = false;
+            }
+          } else {
             allLinkComplete = false;
           }
         }
-      }
       if (hasLink) {
         task.linkChildrenComplete = allLinkComplete;
       }
