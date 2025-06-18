@@ -7,7 +7,7 @@ describe('updateParentStatuses', () => {
       '  - [x] Child1',
       '  - [ ] Child2',
     ].join('\n');
-    let result = updateParentStatuses(content);
+    let result = updateParentStatuses(content, undefined, undefined, undefined, 'ignoretasktree', true);
     expect(result.content).toBe(content);
 
     content = [
@@ -15,7 +15,7 @@ describe('updateParentStatuses', () => {
       '  - [x] Child1',
       '  - [x] Child2',
     ].join('\n');
-    result = updateParentStatuses(content, result.state);
+    result = updateParentStatuses(content, result.state, undefined, undefined, 'ignoretasktree', true);
     expect(result.content).toBe(
       ['- [x] Parent', '  - [x] Child1', '  - [x] Child2'].join('\n')
     );
@@ -27,7 +27,7 @@ describe('updateParentStatuses', () => {
       '  - [x] Child1',
       '  - [x] Child2',
     ].join('\n');
-    let result = updateParentStatuses(content);
+    let result = updateParentStatuses(content, undefined, undefined, undefined, 'ignoretasktree', true);
     expect(result.content).toBe(content);
 
     content = [
@@ -35,7 +35,7 @@ describe('updateParentStatuses', () => {
       '  - [ ] Child1',
       '  - [x] Child2',
     ].join('\n');
-    result = updateParentStatuses(content, result.state);
+    result = updateParentStatuses(content, result.state, undefined, undefined, 'ignoretasktree', true);
     expect(result.content).toBe(
       ['- [ ] Parent', '  - [ ] Child1', '  - [x] Child2'].join('\n')
     );
@@ -47,14 +47,14 @@ describe('updateParentStatuses', () => {
       '  - [x] Child1',
       '  - [x] Child2',
     ].join('\n');
-    let result = updateParentStatuses(content);
+    let result = updateParentStatuses(content, undefined, undefined, undefined, 'ignoretasktree', true);
 
     content = [
       '- [x] Parent',
       '  - [x] Child1',
       '  - [x] Child2',
     ].join('\n');
-    result = updateParentStatuses(content, result.state);
+    result = updateParentStatuses(content, result.state, undefined, undefined, 'ignoretasktree', true);
     expect(result.content).toBe(content);
   });
 });

@@ -96,8 +96,20 @@ export function updateParentStatuses(
   prevState?: Map<number, boolean>,
   filePath?: string,
   rootDir?: string,
-  ignoreTag: string = 'ignoretasktree'
+  ignoreTag: string = 'ignoretasktree',
+  autoPropagateTaskStates: boolean = true
 ): UpdateResult {
+  if (!autoPropagateTaskStates) {
+    // If disabled, do not change any parent states, just return the content and state
+    const lines = content.split(/\r?\n/);
+    const tasks = parseTasks(lines);
+    const newState = new Map<number, boolean>();
+    for (const t of tasks) {
+      newState.set(t.line, t.completed);
+    }
+    return { content, state: newState };
+  }
+
   const lines = content.split(/\r?\n/);
   let builder: TaskTreeBuilder | undefined = undefined;
   let dir: string | undefined = undefined;

@@ -22,6 +22,7 @@ interface ProgressTrackerLableSettings {
     inlineFieldName: string;
     representation: string;
     ignoreTag: string;
+    autoPropagateTaskStates: boolean;
 }
 
 interface SourcePathField {
@@ -33,6 +34,7 @@ const DEFAULT_SETTINGS: ProgressTrackerLableSettings = {
     inlineFieldName: 'COMPLETE',
     representation: 'Complete {percentage}% ({completed}/{total})',
     ignoreTag: 'ignoretasktree',
+    autoPropagateTaskStates: true,
 };
 
 function resolveVaultPath(root: string, filePath: string): string | undefined {
@@ -361,7 +363,6 @@ export default class ProgressTrackerLablePlugin extends Plugin {
         const visited = new Set<string>();
         await this.updateFileAndBacklinks(modifiedPath, visited, root);
     }
-
     private async updateFileAndBacklinks(path: string, visited: Set<string>, root: string) {
         if (visited.has(path)) return;
         visited.add(path);
@@ -370,7 +371,14 @@ export default class ProgressTrackerLablePlugin extends Plugin {
         try {
             const content = await this.app.vault.read(abstract);
             const prev = this.fileStates.get(path);
-            const result = updateParentStatuses(content, prev, path, root, this.settings.ignoreTag);
+            const result = updateParentStatuses(
+                content,
+                prev,
+                path,
+                root,
+                this.settings.ignoreTag,
+                this.settings.autoPropagateTaskStates
+            );
             this.fileStates.set(path, result.state);
             if (result.content !== content) {
                 this.skipModify = true;
@@ -478,6 +486,16 @@ class ProgressTrackerLableSettingTab extends PluginSettingTab {
                  .setValue(this.plugin.settings.ignoreTag)
                  .onChange(async (value: string) => {
                      this.plugin.settings.ignoreTag = value;
+                     await this.plugin.saveSettings();
+                 }));
+
+         new Setting(containerEl)
+             .setName('Auto Propagate Task States')
+             .setDesc('Automatically check/uncheck parent tasks when all children change state')
+             .addToggle(toggle => toggle
+                 .setValue(this.plugin.settings.autoPropagateTaskStates)
+                 .onChange(async (value: boolean) => {
+                     this.plugin.settings.autoPropagateTaskStates = value;
                      await this.plugin.saveSettings();
                  }));
     }

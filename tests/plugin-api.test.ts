@@ -16,6 +16,7 @@ const defaultSettings = {
   inlineFieldName: 'COMPLETE',
   representation: 'Complete {percentage}% ({completed}/{total})',
   ignoreTag: 'ignoretasktree',
+  autoPropagateTaskStates: false,
 };
 
 describe('ProgressTrackerLablePlugin.getPageProgress', () => {
