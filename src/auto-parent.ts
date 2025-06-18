@@ -18,7 +18,7 @@ export interface UpdateResult {
   state: Map<number, boolean>;
 }
 
-function parseTasks(
+export function parseTasks(
   lines: string[],
   currentDir?: string,
   builder?: TaskTreeBuilder

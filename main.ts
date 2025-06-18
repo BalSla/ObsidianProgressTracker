@@ -13,7 +13,7 @@ import { editorLivePreviewField } from "obsidian"; // Required for CM6 editor ex
 import { Extension, RangeSetBuilder } from '@codemirror/state';
 import { ViewPlugin, Decoration, DecorationSet, ViewUpdate, WidgetType, EditorView } from '@codemirror/view';
 import { TaskTreeBuilder } from './src/task-tree-builder';
-import { updateParentStatuses } from './src/auto-parent';
+import { updateParentStatuses, parseTasks, ParsedTaskInfo } from './src/auto-parent';
 import { escapeRegex } from './src/utils';
 
 
@@ -49,19 +49,12 @@ export default class ProgressTrackerLablePlugin extends Plugin {
     settings: ProgressTrackerLableSettings;
     private fileStates: Map<string, Map<number, boolean>> = new Map();
     private skipModify = false;
+    // Plugin-level cache: only the active page's ParsedTaskInfo[]
+    private pageTasksCache: ParsedTaskInfo[] | null = null;
+    private lastOpenedFilePath: string | null = null;
 
     async onload() {
         await this.loadSettings();
-
-        // This adds an editor command that can perform some operation on the current editor instance
-        this.addCommand({
-            id: 'sample-editor',
-            name: 'Sample editor command',
-            editorCallback: (editor: Editor, view: MarkdownView) => {
-                console.log(editor.getSelection());
-                editor.replaceSelection('Sample Editor Command');
-            }
-        });
 
         // This adds a settings tab so the user can configure various aspects of the plugin
         this.addSettingTab(new ProgressTrackerLableSettingTab(this.app, this));
@@ -146,6 +139,57 @@ export default class ProgressTrackerLablePlugin extends Plugin {
         this.registerEvent(
             this.app.vault.on('modify', (file: TFile) => this.handleFileModify(file))
         );
+
+        // Register handler for file/leaf open
+        this.registerEvent(
+            this.app.workspace.on('file-open', (file: TFile | null) => this.handleFileOpen(file))
+        );
+        // Register handler for file delete
+        this.registerEvent(
+            this.app.vault.on('delete', (file: TFile) => this.handleFileDelete(file))
+        );
+
+        // Immediately handle the currently active file on plugin load
+        const activeFile = this.app.workspace.getActiveFile();
+        if (activeFile) {
+            await this.handleFileOpen(activeFile);
+        }
+    }
+
+    // Remove related data from pageTasksCache when file is deleted
+    private handleFileDelete(file: TFile) {
+        this.pageTasksCache = null;
+    }
+
+    // Called when a file/leaf is opened
+    private async handleFileOpen(file: TFile | null) {
+        if (!file) return;
+        // Read file content and parse tasks for this page
+        let vaultRoot = '';
+        const adapter = this.app.vault.adapter;
+        if (adapter instanceof FileSystemAdapter) {
+            vaultRoot = adapter.getBasePath();
+        }
+        const absPath = resolveVaultPath(vaultRoot, file.path);
+        if (!absPath) return;
+        try {
+            const content = await this.app.vault.read(file);
+            // Exit if page is tagged with ignoreTag
+            if (content.match(new RegExp(`#${this.settings.ignoreTag}(\s|$)`))) {
+                return;
+            }
+            const lines = content.split(/\r?\n/);
+            const dir = path.dirname(absPath);
+            const builder = new TaskTreeBuilder(vaultRoot, this.settings.ignoreTag);
+            const tasks = parseTasks(lines, dir, builder);
+            if (!tasks || tasks.length === 0) {
+                return;
+            }
+            this.pageTasksCache = tasks;
+        } catch (e) {
+            console.error('[ProgressTracker] Failed to parse tasks for file', file.path, e);
+        }
+        this.lastOpenedFilePath = file ? file.path : null;
     }
 
     private createLivePreviewExtension(): Extension {
@@ -282,13 +326,37 @@ export default class ProgressTrackerLablePlugin extends Plugin {
             this.skipModify = false;
             return;
         }
-
         const modifiedPath = file.path;
-
         let root = '';
         const adapter = this.app.vault.adapter;
         if (adapter instanceof FileSystemAdapter) {
             root = adapter.getBasePath();
+        }
+        // Exit if page is tagged with ignoreTag or contains no tasks
+        try {
+            const content = await this.app.vault.read(file);
+            if (content.match(new RegExp(`#${this.settings.ignoreTag}(\s|$)`))) {
+                return;
+            }
+            const lines = content.split(/\r?\n/);
+            const dir = path.dirname(resolveVaultPath(root, modifiedPath) ?? '');
+            const builder = new TaskTreeBuilder(root, this.settings.ignoreTag);
+            const actualTasks = parseTasks(lines, dir, builder);
+            if (!actualTasks || actualTasks.length === 0) {
+                return;
+            }
+            const cached = this.pageTasksCache;
+            // Compare cached and actual tasks (shallow, by length and line numbers)
+            if (
+                this.lastOpenedFilePath === modifiedPath &&
+                cached &&
+                cached.length === actualTasks.length &&
+                cached.every((t, i) => t.line === actualTasks[i].line && t.completed === actualTasks[i].completed)
+            ) {
+                return;
+            }
+        } catch (e) {
+            console.error('[ProgressTracker] Error comparing cache for file', modifiedPath, e);
         }
         const visited = new Set<string>();
         await this.updateFileAndBacklinks(modifiedPath, visited, root);
