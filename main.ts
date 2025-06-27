@@ -46,6 +46,13 @@ function resolveVaultPath(root: string, filePath: string): string | undefined {
     return abs;
 }
 
+function getVaultRoot(app: App): string {
+    const adapter: any = app.vault.adapter;
+    return typeof adapter.getBasePath === 'function'
+        ? adapter.getBasePath()
+        : '';
+}
+
 export default class ProgressTrackerLablePlugin extends Plugin {
     settings: ProgressTrackerLableSettings;
     private fileStates: Map<string, Map<number, boolean>> = new Map();
@@ -63,11 +70,7 @@ export default class ProgressTrackerLablePlugin extends Plugin {
         // Reading View Processor
         this.registerMarkdownPostProcessor((element, context) => {
             // Determine vault root directory for resolving links
-            let vaultRoot = '';
-            const adapter: any = this.app.vault.adapter;
-            vaultRoot = typeof adapter.getBasePath === 'function'
-                ? adapter.getBasePath()
-                : '';
+            const vaultRoot = getVaultRoot(this.app);
             const builder = new TaskTreeBuilder(vaultRoot, this.settings.ignoreTag);
             const fieldName = this.settings.inlineFieldName;
             const template = this.settings.representation;
@@ -166,11 +169,7 @@ export default class ProgressTrackerLablePlugin extends Plugin {
     private async handleFileOpen(file: TFile | null) {
         if (!file) return;
         // Read file content and parse tasks for this page
-        let vaultRoot = '';
-        const adapter: any = this.app.vault.adapter;
-        vaultRoot = typeof adapter.getBasePath === 'function'
-            ? adapter.getBasePath()
-            : '';
+        const vaultRoot = getVaultRoot(this.app);
         const absPath = resolveVaultPath(vaultRoot, file.path);
         if (!absPath) return;
         try {
@@ -236,11 +235,7 @@ export default class ProgressTrackerLablePlugin extends Plugin {
                         return rangeBuilder.finish();
                     }
                     const sourcePath = (field as unknown as SourcePathField).sourcePath;
-                    let vaultRoot = '';
-                    const adapter: any = plugin.app.vault.adapter;
-                    vaultRoot = typeof adapter.getBasePath === 'function'
-                        ? adapter.getBasePath()
-                        : '';
+                    const vaultRoot = getVaultRoot(plugin.app);
                     const treeBuilder = new TaskTreeBuilder(vaultRoot, plugin.settings.ignoreTag);
                     for (const { from, to } of view.visibleRanges) {
                         const text = view.state.doc.sliceString(from, to);
@@ -328,11 +323,7 @@ export default class ProgressTrackerLablePlugin extends Plugin {
             return;
         }
         const modifiedPath = file.path;
-        let root = '';
-        const adapter: any = this.app.vault.adapter;
-        root = typeof adapter.getBasePath === 'function'
-            ? adapter.getBasePath()
-            : '';
+        const root = getVaultRoot(this.app);
         // Exit if page is tagged with ignoreTag or contains no tasks
         try {
             const content = await this.app.vault.read(file);
@@ -408,11 +399,7 @@ export default class ProgressTrackerLablePlugin extends Plugin {
      * @returns Progress percentage rounded to the nearest whole number
      */
     public getPageProgress(file: TFile | string): number {
-        let vaultRoot = '';
-        const adapter: any = this.app.vault.adapter;
-        vaultRoot = typeof adapter.getBasePath === 'function'
-            ? adapter.getBasePath()
-            : '';
+        const vaultRoot = getVaultRoot(this.app);
         const targetPath = typeof file === 'string' ? file : file.path;
         const resolved = resolveVaultPath(vaultRoot, targetPath);
         if (!resolved) {
