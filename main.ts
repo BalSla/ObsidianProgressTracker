@@ -5,8 +5,7 @@ import {
     Plugin,
     PluginSettingTab,
     Setting,
-    TFile,
-    FileSystemAdapter
+    TFile
 } from 'obsidian';
 import * as path from 'path';
 import { editorLivePreviewField } from "obsidian"; // Required for CM6 editor extensions
@@ -65,10 +64,10 @@ export default class ProgressTrackerLablePlugin extends Plugin {
         this.registerMarkdownPostProcessor((element, context) => {
             // Determine vault root directory for resolving links
             let vaultRoot = '';
-            const adapter = this.app.vault.adapter;
-            if (adapter instanceof FileSystemAdapter) {
-                vaultRoot = adapter.getBasePath();
-            }
+            const adapter: any = this.app.vault.adapter;
+            vaultRoot = typeof adapter.getBasePath === 'function'
+                ? adapter.getBasePath()
+                : '';
             const builder = new TaskTreeBuilder(vaultRoot, this.settings.ignoreTag);
             const fieldName = this.settings.inlineFieldName;
             const template = this.settings.representation;
@@ -168,10 +167,10 @@ export default class ProgressTrackerLablePlugin extends Plugin {
         if (!file) return;
         // Read file content and parse tasks for this page
         let vaultRoot = '';
-        const adapter = this.app.vault.adapter;
-        if (adapter instanceof FileSystemAdapter) {
-            vaultRoot = adapter.getBasePath();
-        }
+        const adapter: any = this.app.vault.adapter;
+        vaultRoot = typeof adapter.getBasePath === 'function'
+            ? adapter.getBasePath()
+            : '';
         const absPath = resolveVaultPath(vaultRoot, file.path);
         if (!absPath) return;
         try {
@@ -238,10 +237,10 @@ export default class ProgressTrackerLablePlugin extends Plugin {
                     }
                     const sourcePath = (field as unknown as SourcePathField).sourcePath;
                     let vaultRoot = '';
-                    const adapter = plugin.app.vault.adapter;
-                    if (adapter instanceof FileSystemAdapter) {
-                        vaultRoot = adapter.getBasePath();
-                    }
+                    const adapter: any = plugin.app.vault.adapter;
+                    vaultRoot = typeof adapter.getBasePath === 'function'
+                        ? adapter.getBasePath()
+                        : '';
                     const treeBuilder = new TaskTreeBuilder(vaultRoot, plugin.settings.ignoreTag);
                     for (const { from, to } of view.visibleRanges) {
                         const text = view.state.doc.sliceString(from, to);
@@ -330,10 +329,10 @@ export default class ProgressTrackerLablePlugin extends Plugin {
         }
         const modifiedPath = file.path;
         let root = '';
-        const adapter = this.app.vault.adapter;
-        if (adapter instanceof FileSystemAdapter) {
-            root = adapter.getBasePath();
-        }
+        const adapter: any = this.app.vault.adapter;
+        root = typeof adapter.getBasePath === 'function'
+            ? adapter.getBasePath()
+            : '';
         // Exit if page is tagged with ignoreTag or contains no tasks
         try {
             const content = await this.app.vault.read(file);
@@ -410,10 +409,10 @@ export default class ProgressTrackerLablePlugin extends Plugin {
      */
     public getPageProgress(file: TFile | string): number {
         let vaultRoot = '';
-        const adapter = this.app.vault.adapter;
-        if (adapter instanceof FileSystemAdapter) {
-            vaultRoot = adapter.getBasePath();
-        }
+        const adapter: any = this.app.vault.adapter;
+        vaultRoot = typeof adapter.getBasePath === 'function'
+            ? adapter.getBasePath()
+            : '';
         const targetPath = typeof file === 'string' ? file : file.path;
         const resolved = resolveVaultPath(vaultRoot, targetPath);
         if (!resolved) {
