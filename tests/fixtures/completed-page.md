@@ -1,0 +1,2 @@
+- [x] Completed task 1
+- [x] Completed task 2

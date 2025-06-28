@@ -194,6 +194,13 @@ export function updateParentStatuses(
   for (const t of sorted) {
     if (t.children.length === 0 && t.linkChildrenComplete === undefined) continue;
     if (t.changed) continue; // skip manually changed parents
+    
+    // Skip newly created leaf tasks with only linked children to prevent auto-checking
+    // A newly created task should not be auto-completed based solely on linked page content
+    if (t.children.length === 0 && prevState && prevState.get(t.line) === undefined) {
+      continue;
+    }
+    
     const childrenComplete = t.children.every((c) => c.completed);
     const linksComplete = t.linkChildrenComplete ?? true;
     const newVal = childrenComplete && linksComplete;
