@@ -41,20 +41,28 @@ describe('updateParentStatuses', () => {
     );
   });
 
-  test('does not change manually toggled parent', () => {
+  test('always updates parent to match children state', () => {
     let content = [
       '- [ ] Parent',
       '  - [x] Child1',
       '  - [x] Child2',
     ].join('\n');
     let result = updateParentStatuses(content, undefined, undefined, undefined, 'ignoretasktree', true);
+    // Parent should be checked since all children are complete
+    expect(result.content).toBe(
+      ['- [x] Parent', '  - [x] Child1', '  - [x] Child2'].join('\n')
+    );
 
+    // Now manually toggle the parent to unchecked, but it should be corrected back to checked
     content = [
-      '- [x] Parent',
+      '- [ ] Parent',
       '  - [x] Child1',
       '  - [x] Child2',
     ].join('\n');
     result = updateParentStatuses(content, result.state, undefined, undefined, 'ignoretasktree', true);
-    expect(result.content).toBe(content);
+    // Parent should be checked again since children are still complete
+    expect(result.content).toBe(
+      ['- [x] Parent', '  - [x] Child1', '  - [x] Child2'].join('\n')
+    );
   });
 });
