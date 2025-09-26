@@ -10,7 +10,6 @@ export interface ParsedTaskInfo {
   children: ParsedTaskInfo[];
   /** True if all linked pages' tasks are complete */
   linkChildrenComplete?: boolean;
-  changed?: boolean;
 }
 
 export interface UpdateResult {
@@ -180,20 +179,10 @@ export function updateParentStatuses(
   }
   const tasks = parseTasks(lines, dir, builder);
 
-  if (prevState) {
-    for (const t of tasks) {
-      const prev = prevState.get(t.line);
-      if (prev !== undefined && prev !== t.completed) {
-        t.changed = true;
-      }
-    }
-  }
-
   const sorted = tasks.slice().sort((a, b) => b.indent - a.indent);
 
   for (const t of sorted) {
     if (t.children.length === 0 && t.linkChildrenComplete === undefined) continue;
-    if (t.changed) continue; // skip manually changed parents
     const childrenComplete = t.children.every((c) => c.completed);
     const linksComplete = t.linkChildrenComplete ?? true;
     const newVal = childrenComplete && linksComplete;
