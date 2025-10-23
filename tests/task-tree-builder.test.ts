@@ -131,4 +131,19 @@ describe('TaskTreeBuilder', () => {
     expect(tree.getCompletionString()).toBe('Complete 25% (1/4)');
   });
 
+  test('handles complex mixed list with multiple tasks and non-task items', () => {
+    // - [ ] Task 1
+    // - [[B]]
+    //     - [ ] Task 2 under B
+    //     - [x] Task 3 under B
+    // - [ ] Task 4
+    // Task 2 and Task 3 should NOT be children of Task 1
+    const file = __dirname + '/fixtures/mixed-list-complex.md';
+    const tree = builder.buildFromFile(file);
+    // Expected: Task 1 + B1 (from B.md) + Task 2 + Task 3 + Task 4
+    // Total: 5 tasks, 1 completed (Task 3)
+    expect(tree.getCounts()).toEqual({ total: 5, completed: 1 });
+    expect(tree.getCompletionString()).toBe('Complete 20% (1/5)');
+  });
+
 });
