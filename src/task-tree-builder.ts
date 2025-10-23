@@ -130,45 +130,88 @@ export class TaskTreeBuilder {
 
     for (const line of lines) {
       const match = /^(\s*)- \[( |x|X)\] (.+)$/.exec(line);
-      if (!match) {
-        continue;
-      }
-      const indent = match[1].length;
-      const completed = match[2].toLowerCase() === 'x';
-      const text = match[3];
-      const node: ParsedTaskNode = { completed, children: [] };
+      if (match) {
+        // This is a task item
+        const indent = match[1].length;
+        const completed = match[2].toLowerCase() === 'x';
+        const text = match[3];
+        const node: ParsedTaskNode = { completed, children: [] };
 
-      // Handle Obsidian links: [[PageName]] or [[PageName|Alias]]
-      const linkMatch = /\[\[([^\]]+)\]\]/.exec(text);
-      if (linkMatch) {
-        // extract actual page name before any pipe alias
-        const rawLink = linkMatch[1];
-        const pageName = rawLink.split('|')[0].trim();
-        // preserve .md extension if present
-        const fileName = pageName.toLowerCase().endsWith('.md') ? pageName : `${pageName}.md`;
-        const linkPath = path.resolve(currentDir, fileName);
-        if (this.isPathInsideRoot(linkPath) && fs.existsSync(linkPath)) {
-          // detect page link cycles by checking recursion stack
-          if (this.fileStack.includes(linkPath)) {
-            // set file-level cycle flag
-            this.hasFileCycle = true;
-            // create self-cycle to trigger TaskTree cycle detection if needed
-            node.children = [node];
-          } else {
-            const subtree = this.buildFromFile(linkPath);
-            // Use private API of TaskTree to extract root nodes via reflection
-            // @ts-ignore
-            node.children = subtree['rootNodes'] || [];
+        // Handle Obsidian links: [[PageName]] or [[PageName|Alias]]
+        const linkMatch = /\[\[([^\]]+)\]\]/.exec(text);
+        if (linkMatch) {
+          // extract actual page name before any pipe alias
+          const rawLink = linkMatch[1];
+          const pageName = rawLink.split('|')[0].trim();
+          // preserve .md extension if present
+          const fileName = pageName.toLowerCase().endsWith('.md') ? pageName : `${pageName}.md`;
+          const linkPath = path.resolve(currentDir, fileName);
+          if (this.isPathInsideRoot(linkPath) && fs.existsSync(linkPath)) {
+            // detect page link cycles by checking recursion stack
+            if (this.fileStack.includes(linkPath)) {
+              // set file-level cycle flag
+              this.hasFileCycle = true;
+              // create self-cycle to trigger TaskTree cycle detection if needed
+              node.children = [node];
+            } else {
+              const subtree = this.buildFromFile(linkPath);
+              // Use private API of TaskTree to extract root nodes via reflection
+              // @ts-ignore
+              node.children = subtree['rootNodes'] || [];
+            }
           }
         }
-      }
 
-      // Determine the correct parent based on indentation
-      while (stack.length > 0 && indent <= stack[stack.length - 1].indent) {
-        stack.pop();
+        // Determine the correct parent based on indentation
+        while (stack.length > 0 && indent <= stack[stack.length - 1].indent) {
+          stack.pop();
+        }
+        stack[stack.length - 1].children.push(node);
+        stack.push({ indent, children: node.children });
+      } else {
+        // Check if this is a non-task list item (e.g., "- [[Link]]")
+        const nonTaskMatch = /^(\s*)- (.+)$/.exec(line);
+        if (nonTaskMatch) {
+          const indent = nonTaskMatch[1].length;
+          const text = nonTaskMatch[2];
+          
+          // Adjust stack to correct parent level based on indentation
+          while (stack.length > 0 && indent <= stack[stack.length - 1].indent) {
+            stack.pop();
+          }
+          
+          // Handle Obsidian links in non-task items
+          const linkMatch = /\[\[([^\]]+)\]\]/.exec(text);
+          if (linkMatch) {
+            // extract actual page name before any pipe alias
+            const rawLink = linkMatch[1];
+            const pageName = rawLink.split('|')[0].trim();
+            // preserve .md extension if present
+            const fileName = pageName.toLowerCase().endsWith('.md') ? pageName : `${pageName}.md`;
+            const linkPath = path.resolve(currentDir, fileName);
+            if (this.isPathInsideRoot(linkPath) && fs.existsSync(linkPath)) {
+              // detect page link cycles by checking recursion stack
+              if (!this.fileStack.includes(linkPath)) {
+                const subtree = this.buildFromFile(linkPath);
+                // @ts-ignore
+                const linkedNodes = subtree['rootNodes'] || [];
+                
+                // Add all nodes from the linked file to the current parent
+                for (const linkedNode of linkedNodes) {
+                  stack[stack.length - 1].children.push(linkedNode);
+                }
+              } else {
+                // Cycle detected, but for non-task items we just skip
+                this.hasFileCycle = true;
+              }
+            }
+          }
+          
+          // Push the current parent's children array back onto the stack with this non-task item's indent
+          // This ensures that items indented under it are added to the same parent, not to previous tasks
+          stack.push({ indent, children: stack[stack.length - 1].children });
+        }
       }
-      stack[stack.length - 1].children.push(node);
-      stack.push({ indent, children: node.children });
     }
 
     return rootNodes;
