@@ -117,4 +117,18 @@ describe('TaskTreeBuilder', () => {
     expect(tree.getCompletionString()).toBe('Complete 0% (0/1)');
   });
 
+  test('handles mixed list with non-task items correctly', () => {
+    // Bug: tasks indented under non-task items should not be children of previous task
+    // - [ ] A
+    // - [[B]]
+    //     - [ ] [[C]]
+    // Task C should NOT be a child of task A
+    const file = __dirname + '/fixtures/mixed-list.md';
+    const tree = builder.buildFromFile(file);
+    // Expected: Task A (1 incomplete) + Tasks from B (1 incomplete) + Tasks from C (1 incomplete, 1 complete)
+    // Total: 4 tasks, 1 completed (C2)
+    expect(tree.getCounts()).toEqual({ total: 4, completed: 1 });
+    expect(tree.getCompletionString()).toBe('Complete 25% (1/4)');
+  });
+
 });
