@@ -146,4 +146,37 @@ describe('TaskTreeBuilder', () => {
     expect(tree.getCompletionString()).toBe('Complete 20% (1/5)');
   });
 
+  test('marking Task 2 complete does not mark Task 1 as complete (separate list items)', () => {
+    // Build the tree from the same fixture used above
+    const file = __dirname + '/fixtures/mixed-list-complex.md';
+    const tree: any = builder.buildFromFile(file);
+
+    // Access the internal root nodes (tests already use this pattern elsewhere)
+    // Expected root node order: [ Task 1, B1(from B.md), Task 2 under B, Task 3 under B, Task 4 ]
+    const roots = tree['rootNodes'];
+    expect(roots.length).toBe(5);
+
+    const task1 = roots[0];
+    const task2 = roots[2];
+    const task3 = roots[3];
+
+    // Sanity: initial states (task1 incomplete, task2 incomplete, task3 completed)
+    expect(task1.completed).toBe(false);
+    expect(task2.completed).toBe(false);
+    expect(task3.completed).toBe(true);
+    const countsBefore = tree.getCounts();
+    // Now completed should be 1 (Task 3), total still 5
+    expect(countsBefore).toEqual({ total: 5, completed: 1 });
+
+
+    // Mark Task 2 as completed and verify counts update
+    task2.completed = true;
+    const countsAfter = tree.getCounts();
+    // Now completed should be 2 (Task 2 + Task 3), total still 5
+    expect(countsAfter).toEqual({ total: 5, completed: 2 });
+
+    // Ensure Task 1 remains incomplete (Task 2 is not its child)
+    expect(task1.completed).toBe(false);
+  });
+
 });

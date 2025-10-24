@@ -28,17 +28,18 @@ export function parseTasks(
   ];
 
   for (let i = 0; i < lines.length; i++) {
-    const match = /^(\s*)- \[( |x|X)\](.*)$/.exec(lines[i]);
-    if (!match) continue;
-    const indent = match[1].length;
-    const completed = match[2].toLowerCase() === 'x';
-    const text = match[3] || '';
-    const task: ParsedTaskInfo = {
-      line: i,
-      indent,
-      completed,
-      children: [],
-    };
+    // Match a task line: "- [ ]" or "- [x]"
+    const matchTask = /^(\s*)- \[( |x|X)\](.*)$/.exec(lines[i]);
+    if (matchTask) {
+      const indent = matchTask[1].length;
+      const completed = matchTask[2].toLowerCase() === 'x';
+      const text = matchTask[3] || '';
+      const task: ParsedTaskInfo = {
+        line: i,
+        indent,
+        completed,
+        children: [],
+      };
 
     if (builder && currentDir) {
       const linkRegex = /\[\[([^\]]+)\]\]/g;
@@ -136,16 +137,33 @@ export function parseTasks(
       }
     }
 
-    while (stack.length > 0 && indent <= stack[stack.length - 1].indent) {
-      stack.pop();
+      while (stack.length > 0 && indent <= stack[stack.length - 1].indent) {
+        stack.pop();
+      }
+      const parent = stack[stack.length - 1].task;
+      if (parent) {
+        task.parent = parent;
+        parent.children.push(task);
+      }
+      tasks.push(task);
+      stack.push({ indent, task });
+      continue;
     }
-    const parent = stack[stack.length - 1].task;
-    if (parent) {
-      task.parent = parent;
-      parent.children.push(task);
+
+    // If it's a non-task list item (e.g. "- [[B]]"), track its indentation
+    // so that subsequent indented tasks attach to this list item instead of
+    // the previous task above it.
+    const matchList = /^(\s*)-\s(?!\[( |x|X)\])(.*)$/.exec(lines[i]);
+    if (matchList) {
+      const indent = matchList[1].length;
+      // Pop any stack items that are at or deeper than this indent
+      while (stack.length > 0 && indent <= stack[stack.length - 1].indent) {
+        stack.pop();
+      }
+      // Push a placeholder with no task so children won't attach to earlier tasks
+      stack.push({ indent, task: undefined });
+      continue;
     }
-    tasks.push(task);
-    stack.push({ indent, task });
   }
 
   return tasks;

@@ -66,3 +66,24 @@ describe('updateParentStatuses', () => {
     );
   });
 });
+
+describe ('auto-parent with mixed lists', () => {
+  test('handles mixed list with tasks and non-task items', () => {
+    let content = [
+      '- [ ] Task 1',
+      '- [[B]]',
+      '    - [x] Task 2 under B',
+      '    - [x] Task 3 under B',
+      '- [ ] Task 4',
+    ].join('\n');
+    let result = updateParentStatuses(content, undefined, undefined, undefined, 'ignoretasktree', true);
+    let expected = [
+      '- [ ] Task 1',
+      '- [[B]]',
+      '    - [x] Task 2 under B',
+      '    - [x] Task 3 under B',
+      '- [ ] Task 4',
+    ].join('\n');
+    expect(result.content).toBe(expected);
+  });
+});

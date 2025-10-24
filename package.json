@@ -1,6 +1,6 @@
 {
   "name": "progress-tracker-label",
-  "version": "1.6.4",
+  "version": "1.6.5",
   "description": "Progress Tracker plugin for Obsidian (https://obsidian.md)",
   "main": "main.js",
   "scripts": {
