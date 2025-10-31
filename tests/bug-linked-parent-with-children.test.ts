@@ -2,59 +2,57 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { updateParentStatuses } from '../src/auto-parent';
 
-describe('Bug: linked parent with incomplete linked page and complete children', () => {
+describe('Parent task with link and child tasks', () => {
   const root = path.join(__dirname, 'fixtures');
 
   test('parent with link to incomplete page and all children complete should remain unchecked', () => {
-    // pageB has an incomplete task
-    // pageA has a parent task linking to pageB with all children complete
+    // Scenario: parent task links to pageB (which has incomplete tasks)
+    // and has two child tasks that are both complete.
+    // Expected: parent should remain unchecked because linked page has incomplete tasks
     const filePath = path.join(root, 'pageA.md');
     
-    // Simulate the scenario where child B is now checked
     const content = `- [ ] [[pageB]]
   - [x] child A
   - [x] child B`;
     
     const result = updateParentStatuses(content, undefined, filePath, root, 'ignoretasktree', true);
     
-    console.log('Result content:', result.content);
-    
-    // Expected: parent should remain unchecked because pageB has incomplete tasks
-    // The parent should not be checked just because all its direct children are complete
+    // Parent should remain unchecked despite all children being complete
+    // because pageB has incomplete tasks
     expect(result.content.split(/\r?\n/)[0]).toBe('- [ ] [[pageB]]');
+    expect(result.content).toBe(content); // No changes should be made
   });
 
-  test('actually reproduce the bug - with 1-space indent', () => {
-    // Try with 1-space indentation
-    const filePath = path.join(root, 'pageA.md');
+  test('parent with link to complete page and all children complete should be checked', () => {
+    // Scenario: parent task links to a page with all tasks complete
+    // and has two child tasks that are both complete.
+    // Expected: parent should be checked
+    const filePath = path.join(root, 'pageA-complete.md');
     
-    const content = `- [ ] [[pageB]]
- - [x] child A
- - [x] child B`;
-    
-    const { parseTasks } = require('../src/auto-parent');
-    const lines = content.split(/\r?\n/);
-    const { TaskTreeBuilder } = require('../src/task-tree-builder');
-    const builder = new TaskTreeBuilder(root, 'ignoretasktree');
-    const dir = path.dirname(filePath);
-    const tasks = parseTasks(lines, dir, builder);
-    
-    console.log('1-space indent - Task count:', tasks.length);
-    console.log('1-space indent - Task 0 linkChildrenComplete:', tasks[0]?.linkChildrenComplete);
-    console.log('1-space indent - Task 0 children.length:', tasks[0]?.children.length);
-    if (tasks[0]) {
-      console.log('1-space indent - Task 0 children completed:', tasks[0].children.map((c: any) => c.completed));
-    }
+    const content = `- [ ] [[subpage-complete]]
+  - [x] child A
+  - [x] child B`;
     
     const result = updateParentStatuses(content, undefined, filePath, root, 'ignoretasktree', true);
     
-    console.log('1-space indent - Result content:', result.content);
+    // Parent should be checked because both children and linked page are complete
+    expect(result.content.split(/\r?\n/)[0]).toBe('- [x] [[subpage-complete]]');
+  });
+
+  test('parent with link and incomplete children should remain unchecked', () => {
+    // Scenario: parent task has a link (doesn't matter if page is complete)
+    // but has at least one incomplete child
+    // Expected: parent should remain unchecked
+    const filePath = path.join(root, 'pageA.md');
     
-    const firstLine = result.content.split(/\r?\n/)[0];
-    if (firstLine === '- [x] [[pageB]]') {
-      console.log('BUG CONFIRMED with 1-space indent!');
-    } else {
-      console.log('Bug still NOT reproduced with 1-space indent');
-    }
+    const content = `- [ ] [[subpage-complete]]
+  - [x] child A
+  - [ ] child B`;
+    
+    const result = updateParentStatuses(content, undefined, filePath, root, 'ignoretasktree', true);
+    
+    // Parent should remain unchecked because child B is incomplete
+    expect(result.content.split(/\r?\n/)[0]).toBe('- [ ] [[subpage-complete]]');
+    expect(result.content).toBe(content); // No changes should be made
   });
 });
