@@ -188,7 +188,7 @@ describe('TaskTreeBuilder', () => {
       // - Point Item
       //   - [ ] task C
       //   - [ ] task D
-      // Expected: task A (1), task B with subtask B A as child (1 parent counted via child), task C (1), task D (1) = 0/4
+      // Expected: Only leaf tasks are counted: task A (leaf=1), subtask B A (leaf=1), task C (leaf=1), task D (leaf=1) = 0/4
       const file = __dirname + '/fixtures/non-task-with-tasks-1.md';
       const tree = builder.buildFromFile(file);
       expect(tree.getCounts()).toEqual({ total: 4, completed: 0 });
@@ -203,13 +203,10 @@ describe('TaskTreeBuilder', () => {
       // - [ ] Point Item
       //   - [ ] task C
       //   - [ ] task D
-      // The current TaskTree logic counts leaf tasks only. Parent tasks don't count themselves:
-      // - task A is a leaf task = 1
-      // - subtask B A is a leaf task = 1  
-      // - task C is a leaf task = 1
-      // - task D is a leaf task = 1
+      // The current implementation counts only leaf tasks: task A (1), subtask B A (1), task C (1), task D (1).
+      // Point Item as a parent task doesn't count itself, only its leaf children are counted.
       // Total = 0/4 (Note: The issue description suggested 0/3, but the current implementation 
-      // counts all leaf tasks, resulting in 0/4. Point Item is a parent task and not counted.)
+      // consistently counts only leaf tasks regardless of parent type.)
       const file = __dirname + '/fixtures/non-task-with-tasks-2.md';
       const tree = builder.buildFromFile(file);
       expect(tree.getCounts()).toEqual({ total: 4, completed: 0 });
@@ -221,11 +218,11 @@ describe('TaskTreeBuilder', () => {
       // - [ ] task A
       // - [ ] task B
       //   - [ ] subtask B A
-      // -  Point Item
+      // - Point Item
       //   - Sub Point
       //     - [ ] task C
       //     - [ ] task D
-      // Expected: task A (1), task B with subtask B A child (1), task C (1), task D (1) = 0/4
+      // Expected: Only leaf tasks are counted: task A (leaf=1), subtask B A (leaf=1), task C (leaf=1), task D (leaf=1) = 0/4
       const file = __dirname + '/fixtures/non-task-with-tasks-3.md';
       const tree = builder.buildFromFile(file);
       expect(tree.getCounts()).toEqual({ total: 4, completed: 0 });
