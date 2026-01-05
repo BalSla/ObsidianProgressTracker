@@ -10,6 +10,7 @@ export class TaskTreeBuilder {
   private rootDir: string;
   private ignoreTag: string;
   private fileStack: string[] = [];  // track current file recursion stack
+  private hasFileCycle: boolean = false;
 
   private isPathInsideRoot(p: string): boolean {
     const rel = path.relative(this.rootDir, p);
