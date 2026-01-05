@@ -1,0 +1,2 @@
+- [ ] Task with link [[recursive-task-subpage]]
+- [x] Completed task

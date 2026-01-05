@@ -1,0 +1,4 @@
+- [ ] Task with inline link [[recursive-mixed-sub1]]
+- [[recursive-mixed-sub2]]
+- [ ] Another task
+    - [ ] Nested task with link [[recursive-mixed-sub3]]

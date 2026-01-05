@@ -2,29 +2,6 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { ParsedTaskNode, TaskTree } from './task-tree';
 
-// Subclass TaskTree to override completion string based on file link cycles
-class BuilderTaskTree extends TaskTree {
-  constructor(rootNodes: ParsedTaskNode[], private fileHasCycle: boolean) {
-    super(rootNodes);
-  }
-  public getCounts(): import('./task-tree').TaskCounts {
-    // Return zeros if a page-link cycle was detected
-    if (this.fileHasCycle) {
-      return { total: 0, completed: 0 };
-    }
-    return super.getCounts();
-  }
-  public getCompletionString(): string {
-    // Delegate to base implementation
-    const base = super.getCompletionString();
-    // Append error icon if file-level cycle detected
-    if (this.fileHasCycle && !base.endsWith(' ❗')) {
-      return base + ' ❗';
-    }
-    return base;
-  }
-}
-
 /**
  * Builds a TaskTree from an Obsidian markdown page by parsing tasks and recursively including linked pages.
  */
@@ -32,7 +9,6 @@ export class TaskTreeBuilder {
   private cache = new Set<string>();
   private rootDir: string;
   private ignoreTag: string;
-  private hasFileCycle: boolean = false;  // flag for cycle in page links
   private fileStack: string[] = [];  // track current file recursion stack
 
   private isPathInsideRoot(p: string): boolean {
@@ -82,7 +58,6 @@ export class TaskTreeBuilder {
     const isRootCall = this.fileStack.length === 0;
     if (isRootCall) {
       this.cache.clear();
-      this.hasFileCycle = false;
       this.fileStack = [];
     }
 
@@ -109,13 +84,12 @@ export class TaskTreeBuilder {
     // ignore pages tagged to skip task tree
     if (content.includes(`#${this.ignoreTag}`)) {
       this.fileStack.pop();
-      return new BuilderTaskTree([], false);
+      return new TaskTree([]);
     }
     const lines = content.split(/\r?\n/);
     const nodes = this.parseLines(lines, path.dirname(absPath));
     this.fileStack.pop();
-    // Use BuilderTaskTree to reflect file link cycle in completion string
-    const tree = new BuilderTaskTree(nodes, isRootCall && this.hasFileCycle);
+    const tree = new TaskTree(nodes);
     return tree;
   }
 
@@ -149,10 +123,9 @@ export class TaskTreeBuilder {
           if (this.isPathInsideRoot(linkPath) && fs.existsSync(linkPath)) {
             // detect page link cycles by checking recursion stack
             if (this.fileStack.includes(linkPath)) {
-              // set file-level cycle flag
-              this.hasFileCycle = true;
-              // create self-cycle to trigger TaskTree cycle detection if needed
-              node.children = [node];
+              // Cycle detected: don't add children (treat as 0 additional tasks)
+              // The task itself still counts, just the link contributes nothing
+              node.children = [];
             } else {
               const subtree = this.buildFromFile(linkPath);
               // Use private API of TaskTree to extract root nodes via reflection

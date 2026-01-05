@@ -1,0 +1,1 @@
+- [ ] Task with alias [[recursive-alias-sub|Custom Alias]]

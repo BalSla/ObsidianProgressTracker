@@ -1,0 +1,5 @@
+- [ ] Root task A
+- [[recursive-list-indent-sub]]
+    - [ ] Task under list link
+    - [x] Completed under list link
+- [ ] Root task B

@@ -1,0 +1,2 @@
+- [x] Aliased subpage task
+- [ ] Another aliased task
