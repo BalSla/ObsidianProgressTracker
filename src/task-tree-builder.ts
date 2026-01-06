@@ -102,6 +102,8 @@ export class TaskTreeBuilder {
     const stack: Array<{ indent: number; children: ParsedTaskNode[] }> = [
       { indent: -1, children: rootNodes },
     ];
+    // Track linked pages within this file to avoid duplicate counting
+    const linkedPagesInFile = new Set<string>();
 
     for (const line of lines) {
       const match = /^(\s*)- \[( |x|X)\] (.+)$/.exec(line);
@@ -127,7 +129,13 @@ export class TaskTreeBuilder {
               // Cycle detected: don't add children (treat as 0 additional tasks)
               // The task itself still counts, just the link contributes nothing
               node.children = [];
+            } else if (linkedPagesInFile.has(linkPath)) {
+              // Page already linked in this file: treat as leaf task (no children)
+              // This prevents duplicate counting of tasks from the same linked page
+              node.children = [];
             } else {
+              // First time linking to this page in this file
+              linkedPagesInFile.add(linkPath);
               const subtree = this.buildFromFile(linkPath);
               // Use private API of TaskTree to extract root nodes via reflection
               // @ts-ignore
@@ -165,7 +173,9 @@ export class TaskTreeBuilder {
             const linkPath = path.resolve(currentDir, fileName);
             if (this.isPathInsideRoot(linkPath) && fs.existsSync(linkPath)) {
               // detect page link cycles by checking recursion stack
-              if (!this.fileStack.includes(linkPath)) {
+              if (!this.fileStack.includes(linkPath) && !linkedPagesInFile.has(linkPath)) {
+                // Only include if not a cycle and not already linked in this file
+                linkedPagesInFile.add(linkPath);
                 const subtree = this.buildFromFile(linkPath);
                 // @ts-ignore
                 const linkedNodes = subtree['rootNodes'] || [];
@@ -174,10 +184,11 @@ export class TaskTreeBuilder {
                 for (const linkedNode of linkedNodes) {
                   stack[stack.length - 1].children.push(linkedNode);
                 }
-              } else {
+              } else if (this.fileStack.includes(linkPath)) {
                 // Cycle detected, but for non-task items we just skip
                 this.hasFileCycle = true;
               }
+              // If linkedPagesInFile has it, we just skip (no error, no adding nodes)
             }
           }
           
