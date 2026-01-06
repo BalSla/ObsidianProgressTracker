@@ -102,7 +102,8 @@ export class TaskTreeBuilder {
     const stack: Array<{ indent: number; children: ParsedTaskNode[] }> = [
       { indent: -1, children: rootNodes },
     ];
-    // Track linked pages within this file to avoid duplicate counting
+    // Track linked pages within this file's parsing session to avoid duplicate counting
+    // This Set is local to each parseLines call, not global across all files
     const linkedPagesInFile = new Set<string>();
 
     for (const line of lines) {
@@ -185,10 +186,10 @@ export class TaskTreeBuilder {
                   stack[stack.length - 1].children.push(linkedNode);
                 }
               } else if (this.fileStack.includes(linkPath)) {
-                // Cycle detected, but for non-task items we just skip
+                // Cycle detected, skip adding nodes and mark cycle
                 this.hasFileCycle = true;
               }
-              // If linkedPagesInFile has it, we just skip (no error, no adding nodes)
+              // If linkedPagesInFile has it, skip silently (deduplication)
             }
           }
           

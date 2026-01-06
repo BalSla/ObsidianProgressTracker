@@ -21,8 +21,7 @@ describe('Duplicate link handling', () => {
   });
 
   test('three tasks linking to same page - only first includes children', () => {
-    // Create a test fixture with three links
-    const builder = new TaskTreeBuilder();
+    // Reuse the builder instance - TaskTreeBuilder is stateless for individual calls
     const file = __dirname + '/fixtures/triple-link.md';
     const tree = builder.buildFromFile(file);
     const counts = tree.getCounts();
