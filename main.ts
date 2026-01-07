@@ -13,7 +13,7 @@ import { Extension, RangeSetBuilder } from '@codemirror/state';
 import { ViewPlugin, Decoration, DecorationSet, ViewUpdate, WidgetType, EditorView } from '@codemirror/view';
 import { TaskTreeBuilder } from './src/task-tree-builder';
 import { updateParentStatuses, parseTasks, ParsedTaskInfo } from './src/auto-parent';
-import { escapeRegex } from './src/utils';
+import { escapeRegex, containsTag } from './src/utils';
 
 
 interface ProgressTrackerLableSettings {
@@ -176,7 +176,7 @@ export default class ProgressTrackerLablePlugin extends Plugin {
         try {
             const content = await this.app.vault.read(file);
             // Exit if page is tagged with ignoreTag
-            if (content.match(new RegExp(`#${this.settings.ignoreTag}(\s|$)`))) {
+            if (containsTag(content, this.settings.ignoreTag)) {
                 return;
             }
             const lines = content.split(/\r?\n/);
@@ -336,7 +336,7 @@ export default class ProgressTrackerLablePlugin extends Plugin {
         // Exit if page is tagged with ignoreTag or contains no tasks
         try {
             const content = await this.app.vault.read(file);
-            if (content.match(new RegExp(`#${this.settings.ignoreTag}(\s|$)`))) {
+            if (containsTag(content, this.settings.ignoreTag)) {
                 return;
             }
             const lines = content.split(/\r?\n/);
