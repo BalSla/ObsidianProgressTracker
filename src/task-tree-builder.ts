@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { ParsedTaskNode, TaskTree } from './task-tree';
+import { containsTag } from './utils';
 
 /**
  * Builds a TaskTree from an Obsidian markdown page by parsing tasks and recursively including linked pages.
@@ -40,7 +41,7 @@ export class TaskTreeBuilder {
       return false;
     }
     const content = fs.readFileSync(absPath, 'utf-8');
-    return content.includes(`#${this.ignoreTag}`);
+    return containsTag(content, this.ignoreTag);
   }
 
   /**
@@ -83,7 +84,7 @@ export class TaskTreeBuilder {
 
     const content = fs.readFileSync(absPath, 'utf-8');
     // ignore pages tagged to skip task tree
-    if (content.includes(`#${this.ignoreTag}`)) {
+    if (containsTag(content, this.ignoreTag)) {
       this.fileStack.pop();
       return new TaskTree([]);
     }
