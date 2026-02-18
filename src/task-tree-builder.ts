@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { ParsedTaskNode, TaskTree } from './task-tree';
-import { containsTag } from './utils';
+import { escapeRegex } from './utils';
 
 /**
  * Builds a TaskTree from an Obsidian markdown page by parsing tasks and recursively including linked pages.
@@ -29,6 +29,7 @@ export class TaskTreeBuilder {
 
   /**
    * Returns true if the given file contains the ignore tag.
+   * Uses word boundary matching to ensure tags like #ignoretasktree1 don't match when looking for #ignoretasktree
    */
   public shouldIgnoreFile(filePath: string): boolean {
     const absPath = path.isAbsolute(filePath)
@@ -41,7 +42,10 @@ export class TaskTreeBuilder {
       return false;
     }
     const content = fs.readFileSync(absPath, 'utf-8');
-    return containsTag(content, this.ignoreTag);
+    // Match tag with word boundary: tag must be followed by whitespace or end of line
+    const tagPattern = `#${escapeRegex(this.ignoreTag)}(?:\\s|$)`;
+    const tagRegex = new RegExp(tagPattern);
+    return tagRegex.test(content);
   }
 
   /**
@@ -83,8 +87,10 @@ export class TaskTreeBuilder {
     this.fileStack.push(absPath);
 
     const content = fs.readFileSync(absPath, 'utf-8');
-    // ignore pages tagged to skip task tree
-    if (containsTag(content, this.ignoreTag)) {
+    // ignore pages tagged to skip task tree (match with word boundary)
+    const tagPattern = `#${escapeRegex(this.ignoreTag)}(?:\\s|$)`;
+    const tagRegex = new RegExp(tagPattern);
+    if (tagRegex.test(content)) {
       this.fileStack.pop();
       return new TaskTree([]);
     }

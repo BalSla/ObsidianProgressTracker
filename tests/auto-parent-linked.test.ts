@@ -12,6 +12,13 @@ describe('updateParentStatuses with links', () => {
     expect(result.content.trim()).toBe('- [x] Parent Task [[subpage-complete]]');
   });
 
+  test('do not unchecks parent when linked page tasks are incompleted and ignored', () => {
+    const filePath = path.join(root, 'main-linked-complete.md');
+    const content = `- [x] Parent Task [[complex-tasks-note]]`;
+    const result = updateParentStatuses(content, undefined, filePath, root, 'ignoretasktree', true);
+    expect(result.content.trim()).toBe('- [x] Parent Task [[complex-tasks-note]]');
+  });
+
   test('unchecks parent when linked page has incomplete tasks', () => {
     const filePath = path.join(root, 'main-checked.md');
     const content = fs.readFileSync(filePath, 'utf8');

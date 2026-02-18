@@ -1,0 +1,2 @@
+- [ ] Link to complex page [[complex-tasks-note.md]]
+- [x] My own task

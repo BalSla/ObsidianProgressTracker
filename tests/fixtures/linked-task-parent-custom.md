@@ -1,0 +1,2 @@
+- [ ] My local task
+- [ ] Linked task [[linked-task-page-custom.md]]
