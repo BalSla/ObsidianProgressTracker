@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { TaskTreeBuilder } from './task-tree-builder';
+import { containsTag } from './utils';
 
 export interface ParsedTaskInfo {
   line: number;
@@ -20,7 +21,8 @@ export interface UpdateResult {
 export function parseTasks(
   lines: string[],
   currentDir?: string,
-  builder?: TaskTreeBuilder
+  builder?: TaskTreeBuilder,
+  ignoreTag?: string
 ): ParsedTaskInfo[] {
   const tasks: ParsedTaskInfo[] = [];
   const stack: Array<{ indent: number; task?: ParsedTaskInfo }> = [
@@ -106,6 +108,10 @@ export function parseTasks(
         if (fs.existsSync(linkPath)) {
           try {
             const content = fs.readFileSync(linkPath, 'utf8');
+            // Check if the linked file should be ignored
+            if (ignoreTag && containsTag(content, ignoreTag)) {
+              continue; // Skip this ignored link
+            }
             const subLines = content.split(/\r?\n/);
             // Count tasks in the linked file
             let total = 0, completed = 0;
@@ -180,7 +186,7 @@ export function updateParentStatuses(
   if (!autoPropagateTaskStates) {
     // If disabled, do not change any parent states, just return the content and state
     const lines = content.split(/\r?\n/);
-    const tasks = parseTasks(lines);
+    const tasks = parseTasks(lines, undefined, undefined, ignoreTag);
     const newState = new Map<number, boolean>();
     for (const t of tasks) {
       newState.set(t.line, t.completed);
@@ -195,7 +201,7 @@ export function updateParentStatuses(
     dir = path.dirname(path.isAbsolute(filePath) ? filePath : path.resolve(rootDir, filePath));
     builder = new TaskTreeBuilder(rootDir, ignoreTag);
   }
-  const tasks = parseTasks(lines, dir, builder);
+  const tasks = parseTasks(lines, dir, builder, ignoreTag);
 
   const sorted = tasks.slice().sort((a, b) => b.indent - a.indent);
 

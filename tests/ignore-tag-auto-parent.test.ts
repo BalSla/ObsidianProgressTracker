@@ -1,4 +1,4 @@
-import { updateParentStatuses } from '../src/auto-parent';
+import { updateParentStatuses, parseTasks } from '../src/auto-parent';
 import * as path from 'path';
 
 describe('Ignore tag with auto-parent propagation', () => {
@@ -91,35 +91,19 @@ describe('Ignore tag with auto-parent propagation', () => {
     expect(result.content).toBe('- [ ] Task that links to complete ignored [[ignore-tasktree-all-complete.md]]');
   });
 
-  test('BUG: fallback path does NOT respect ignore tag - will cause task to auto-check', () => {
-    // Simulate calling parseTasks with currentDir but NO builder
-    // This uses the fallback code path that doesn't check ignore tags
-    const content = `- [ ] Task links to complete ignored [[ignore-tasktree-all-complete.md]]`;
+  test('parseTasks fallback path respects ignore tag when provided', () => {
+    // Direct call to parseTasks with currentDir but no builder
+    // This triggers the fallback path
+    const content = `- [ ] Task links to ignored [[ignore-tasktree-all-complete.md]]`;
+    const lines = content.split(/\r?\n/);
     
-    // Call with just filePath (so currentDir is set) but no rootDir (so no builder)
-    // This forces the fallback path in parseTasks
-    const filePath = root + '/parent-link-to-ignored.md';
-    const result = updateParentStatuses(content, undefined, filePath, undefined, 'ignoretasktree', true);
+    const list = parseTasks(lines, root, undefined, 'ignoretasktree');  // currentDir provided, no builder, ignoreTag provided
     
-    console.log('Fallback with filePath only:', result.content);
+    console.log('parseTasks result:', list);
+    console.log('linkChildrenComplete:', list[0]?.linkChildrenComplete);
     
-    // BUG: The fallback path in lines 90-137 doesn't check for ignore tag
-    // So it will see that ignore-tasktree-all-complete.md has all tasks complete
-    // and will mark the parent task as complete (INCORRECTLY)
-    // 
-    // Currently this might pass if the bug exists - let's see
-    const lines = result.content.split('\n');
-    console.log('First line:', lines[0]);
-    
-    // If bug exists, this will be auto-checked to [x]
-    // If bug is fixed, it should remain [ ]
-    if (lines[0].includes('- [x]')) {
-      console.log('BUG CONFIRMED: Task was incorrectly auto-checked!');
-      // For now, expect the bug to exist so the test fails
-      expect(lines[0]).toContain('- [ ]'); // This will FAIL if bug exists
-    } else {
-      console.log('Bug does not exist or fallback path not triggered');
-      expect(lines[0]).toContain('- [ ]');
-    }
+    // The fallback path should check the ignore tag
+    // So linkChildrenComplete should be undefined (ignored file)
+    expect(list[0].linkChildrenComplete).toBeUndefined();
   });
 });

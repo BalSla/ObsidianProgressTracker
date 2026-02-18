@@ -182,7 +182,7 @@ export default class ProgressTrackerLablePlugin extends Plugin {
             const lines = content.split(/\r?\n/);
             const dir = path.dirname(absPath);
             const builder = new TaskTreeBuilder(vaultRoot, this.settings.ignoreTag);
-            const tasks = parseTasks(lines, dir, builder);
+            const tasks = parseTasks(lines, dir, builder, this.settings.ignoreTag);
             if (!tasks || tasks.length === 0) {
                 return;
             }
@@ -342,7 +342,7 @@ export default class ProgressTrackerLablePlugin extends Plugin {
             const lines = content.split(/\r?\n/);
             const dir = path.dirname(resolveVaultPath(root, modifiedPath) ?? '');
             const builder = new TaskTreeBuilder(root, this.settings.ignoreTag);
-            const actualTasks = parseTasks(lines, dir, builder);
+            const actualTasks = parseTasks(lines, dir, builder, this.settings.ignoreTag);
             if (!actualTasks || actualTasks.length === 0) {
                 return;
             }
