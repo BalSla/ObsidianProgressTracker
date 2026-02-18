@@ -1,0 +1,2 @@
+- [ ] Parent task [[ignore-tasktree.md]]
+  - [x] Local child task
