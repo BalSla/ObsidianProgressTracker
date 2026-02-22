@@ -15,9 +15,12 @@ export function escapeRegex(str: string): string {
  * @returns true if the tag is found outside of code blocks
  */
 export function containsTag(content: string, tag: string): boolean {
-  // First, check for tag in YAML frontmatter
+  // First, check for tag in YAML frontmatter (only at the very start of the file)
+  // Check if frontmatter exists and matched at the very beginning of the file (index 0)
   const frontmatterMatch = /^---\s*\n([\s\S]*?)\n---/m.exec(content);
-  if (frontmatterMatch) {
+  let isFrontmatter = false;
+  if (frontmatterMatch && frontmatterMatch.index === 0) {
+    // Only treat it as frontmatter if it matched at the very start of the file
     const frontmatter = frontmatterMatch[1];
     // Check for tags in frontmatter:
     // - tags: [tag1, tag2]
@@ -34,11 +37,12 @@ export function containsTag(content: string, tag: string): boolean {
     if (tagPattern.test(frontmatter)) {
       return true;
     }
+    isFrontmatter = true;
   }
 
   // Remove frontmatter from content before checking body
   let bodyContent = content;
-  if (frontmatterMatch) {
+  if (isFrontmatter && frontmatterMatch) {
     bodyContent = content.slice(frontmatterMatch[0].length);
   }
 

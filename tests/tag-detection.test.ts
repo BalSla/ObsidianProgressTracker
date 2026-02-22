@@ -22,7 +22,8 @@ describe('Tag Detection', () => {
     const file = __dirname + '/fixtures/tag-in-code-block.md';
     const tree = builder.buildFromFile(file);
     // Should process tasks since tag is in code block
-    expect(tree.getCounts()).toEqual({ total: 2, completed: 1 });
+    const counts = tree.getCounts();
+    expect(counts).toEqual({ total: 2, completed: 1 });
     expect(tree.getCompletionString()).toBe('Complete 50% (1/2)');
   });
 

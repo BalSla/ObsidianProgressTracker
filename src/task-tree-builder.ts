@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { ParsedTaskNode, TaskTree } from './task-tree';
-import { escapeRegex } from './utils';
+import { escapeRegex, containsTag } from './utils';
 
 /**
  * Builds a TaskTree from an Obsidian markdown page by parsing tasks and recursively including linked pages.
@@ -30,6 +30,7 @@ export class TaskTreeBuilder {
   /**
    * Returns true if the given file contains the ignore tag.
    * Uses word boundary matching to ensure tags like #ignoretasktree1 don't match when looking for #ignoretasktree
+   * Properly handles frontmatter, code blocks, and inline code.
    */
   public shouldIgnoreFile(filePath: string): boolean {
     const absPath = path.isAbsolute(filePath)
@@ -42,10 +43,7 @@ export class TaskTreeBuilder {
       return false;
     }
     const content = fs.readFileSync(absPath, 'utf-8');
-    // Match tag with word boundary: tag must be followed by whitespace or end of line
-    const tagPattern = `#${escapeRegex(this.ignoreTag)}(?:\\s|$)`;
-    const tagRegex = new RegExp(tagPattern);
-    return tagRegex.test(content);
+    return containsTag(content, this.ignoreTag);
   }
 
   /**
@@ -87,10 +85,8 @@ export class TaskTreeBuilder {
     this.fileStack.push(absPath);
 
     const content = fs.readFileSync(absPath, 'utf-8');
-    // ignore pages tagged to skip task tree (match with word boundary)
-    const tagPattern = `#${escapeRegex(this.ignoreTag)}(?:\\s|$)`;
-    const tagRegex = new RegExp(tagPattern);
-    if (tagRegex.test(content)) {
+    // ignore pages tagged to skip task tree (properly handles frontmatter and code blocks)
+    if (containsTag(content, this.ignoreTag)) {
       this.fileStack.pop();
       return new TaskTree([]);
     }
@@ -106,8 +102,8 @@ export class TaskTreeBuilder {
    */
   private parseLines(lines: string[], currentDir: string): ParsedTaskNode[] {
     const rootNodes: ParsedTaskNode[] = [];
-    const stack: Array<{ indent: number; children: ParsedTaskNode[] }> = [
-      { indent: -1, children: rootNodes },
+    const stack: Array<{ indent: number; children: ParsedTaskNode[]; isTask: boolean }> = [
+      { indent: -1, children: rootNodes, isTask: false },
     ];
     // Track linked pages within this file's parsing session to avoid duplicate counting
     // This Set is local to each parseLines call, not global across all files
@@ -157,7 +153,7 @@ export class TaskTreeBuilder {
           stack.pop();
         }
         stack[stack.length - 1].children.push(node);
-        stack.push({ indent, children: node.children });
+        stack.push({ indent, children: node.children, isTask: true });
       } else {
         // Check if this is a non-task list item (e.g., "- [[Link]]")
         const nonTaskMatch = /^(\s*)- (.+)$/.exec(line);
@@ -188,9 +184,11 @@ export class TaskTreeBuilder {
                 // @ts-ignore
                 const linkedNodes = subtree['rootNodes'] || [];
                 
-                // Add all nodes from the linked file to the current parent
-                for (const linkedNode of linkedNodes) {
-                  stack[stack.length - 1].children.push(linkedNode);
+                const currentParent = stack[stack.length - 1];
+                if (!currentParent.isTask) {
+                  for (const linkedNode of linkedNodes) {
+                    currentParent.children.push(linkedNode);
+                  }
                 }
               } else if (this.fileStack.includes(linkPath)) {
                 // Cycle detected, skip adding nodes and mark cycle
@@ -202,7 +200,7 @@ export class TaskTreeBuilder {
           
           // Push the current parent's children array back onto the stack with this non-task item's indent
           // This ensures that items indented under it are added to the same parent, not to previous tasks
-          stack.push({ indent, children: stack[stack.length - 1].children });
+          stack.push({ indent, children: stack[stack.length - 1].children, isTask: false });
         }
       }
     }
