@@ -347,12 +347,12 @@ export default class ProgressTrackerLablePlugin extends Plugin {
                 return;
             }
             const cached = this.pageTasksCache;
-            // Compare cached and actual tasks (shallow, by length and line numbers)
+            // Compare cached and actual tasks (shallow, by length, line numbers, indent and completion state)
             if (
                 this.lastOpenedFilePath === modifiedPath &&
                 cached &&
                 cached.length === actualTasks.length &&
-                cached.every((t, i) => t.line === actualTasks[i].line && t.completed === actualTasks[i].completed)
+                cached.every((t, i) => t.line === actualTasks[i].line && t.completed === actualTasks[i].completed && t.indent === actualTasks[i].indent)
             ) {
                 return;
             }
