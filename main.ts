@@ -135,17 +135,17 @@ export default class ProgressTrackerLablePlugin extends Plugin {
                 // before the post-processor runs (e.g. COMPLETE:[[SomePage]] → "COMPLETE:" text + <a>SomePage</a>)
                 const prefixPattern = new RegExp(`${escapeRegex(fieldName)}:$`);
                 const linkedReplacements: Array<{prevText: Text, linkEl: Element, beforeText: string, display: string}> = [];
-                p.querySelectorAll('a.internal-link').forEach((linkEl: Element) => {
+                for (const linkEl of p.querySelectorAll('a.internal-link')) {
                     const prevNode = linkEl.previousSibling;
-                    if (!prevNode || prevNode.nodeType !== Node.TEXT_NODE) return;
+                    if (!prevNode || prevNode.nodeType !== Node.TEXT_NODE) continue;
                     const prevText = prevNode as Text;
                     const textContent = prevText.nodeValue || '';
                     const prefixMatch = prefixPattern.exec(textContent);
-                    if (!prefixMatch) return;
-                    const rawLinkName = (linkEl as HTMLElement).dataset.href || linkEl.textContent || '';
+                    if (!prefixMatch) continue;
+                    const rawLinkName = (linkEl as HTMLElement).dataset.href || '';
                     const pageName = rawLinkName.split('|')[0].trim();
                     let filePath: string;
-                    if (pageName && pageName.trim() !== '') {
+                    if (pageName) {
                         const dir = context.sourcePath ? context.sourcePath.replace(/\/[^/]+$/, '') : '';
                         const filename = pageName.endsWith('.md') ? pageName : `${pageName}.md`;
                         filePath = dir ? `${dir}/${filename}` : filename;
@@ -176,7 +176,7 @@ export default class ProgressTrackerLablePlugin extends Plugin {
                     }
                     const beforeText = textContent.slice(0, prefixMatch.index);
                     linkedReplacements.push({prevText, linkEl, beforeText, display});
-                });
+                }
                 for (const {prevText, linkEl, beforeText, display} of linkedReplacements) {
                     const span = document.createElement('span');
                     span.addClass('completed-task-reading');
