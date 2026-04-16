@@ -16,7 +16,7 @@ export function escapeRegex(str: string): string {
  */
 export function containsTag(content: string, tag: string): boolean {
   // First, check for tag in YAML frontmatter
-  const frontmatterMatch = /^---\s*\n([\s\S]*?)\n---/m.exec(content);
+  const frontmatterMatch = /^---\s*\n([\s\S]*?)\n---/.exec(content);
   if (frontmatterMatch) {
     const frontmatter = frontmatterMatch[1];
     // Check for tags in frontmatter:

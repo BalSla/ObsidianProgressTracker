@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { ParsedTaskNode, TaskTree } from './task-tree';
-import { escapeRegex } from './utils';
+import { escapeRegex, containsTag } from './utils';
 
 /**
  * Builds a TaskTree from an Obsidian markdown page by parsing tasks and recursively including linked pages.
@@ -42,10 +42,7 @@ export class TaskTreeBuilder {
       return false;
     }
     const content = fs.readFileSync(absPath, 'utf-8');
-    // Match tag with word boundary: tag must be followed by whitespace or end of line
-    const tagPattern = `#${escapeRegex(this.ignoreTag)}(?:\\s|$)`;
-    const tagRegex = new RegExp(tagPattern);
-    return tagRegex.test(content);
+    return containsTag(content, this.ignoreTag);
   }
 
   /**
@@ -87,10 +84,8 @@ export class TaskTreeBuilder {
     this.fileStack.push(absPath);
 
     const content = fs.readFileSync(absPath, 'utf-8');
-    // ignore pages tagged to skip task tree (match with word boundary)
-    const tagPattern = `#${escapeRegex(this.ignoreTag)}(?:\\s|$)`;
-    const tagRegex = new RegExp(tagPattern);
-    if (tagRegex.test(content)) {
+    // ignore pages tagged to skip task tree (respects frontmatter and excludes code blocks)
+    if (containsTag(content, this.ignoreTag)) {
       this.fileStack.pop();
       return new TaskTree([]);
     }
