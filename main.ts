@@ -71,7 +71,7 @@ export default class ProgressTrackerLablePlugin extends Plugin {
             const builder = new TaskTreeBuilder(vaultRoot, this.settings.ignoreTag);
             const fieldName = this.settings.inlineFieldName;
             const template = this.settings.representation;
-            element.querySelectorAll("p").forEach(p => {
+            element.querySelectorAll("p, li").forEach(p => {
                 const regex = new RegExp(`${escapeRegex(fieldName)}:\\[\\[([^\\]]*)\\]\\]`, 'g');
                 const walker = document.createTreeWalker(p, NodeFilter.SHOW_TEXT);
                 const replacements: Array<{node: Text, frag: DocumentFragment}> = [];
@@ -88,7 +88,11 @@ export default class ProgressTrackerLablePlugin extends Plugin {
                         const linkName = match[1];
                         let filePath: string;
                         if (linkName && linkName.trim() !== '') {
-                            const dir = context.sourcePath ? context.sourcePath.replace(/\/[^/]+$/, '') : '';
+                            let dir = '';
+                            if (context.sourcePath) {
+                                const lastSlash = context.sourcePath.lastIndexOf('/');
+                                dir = lastSlash >= 0 ? context.sourcePath.slice(0, lastSlash) : '';
+                            }
                             const filename = linkName.endsWith('.md') ? linkName : `${linkName}.md`;
                             filePath = dir ? `${dir}/${filename}` : filename;
                         } else {
@@ -129,6 +133,67 @@ export default class ProgressTrackerLablePlugin extends Plugin {
                 }
                 for (const {node, frag} of replacements) {
                     node.replaceWith(frag);
+                }
+
+                // Handle the case where Obsidian pre-renders [[link]] as <a class="internal-link">
+                // before the post-processor runs (e.g. COMPLETE:[[SomePage]] → "COMPLETE:" text + <a>SomePage</a>)
+                const prefixPattern = new RegExp(`${escapeRegex(fieldName)}:$`);
+                const linkedReplacements: Array<{prevText: Text, linkEl: Element, beforeText: string, display: string}> = [];
+                for (const linkEl of Array.from(p.querySelectorAll('a.internal-link'))) {
+                    const prevNode = linkEl.previousSibling;
+                    if (!prevNode || prevNode.nodeType !== Node.TEXT_NODE) continue;
+                    const prevText = prevNode as Text;
+                    const textContent = prevText.nodeValue || '';
+                    const prefixMatch = prefixPattern.exec(textContent);
+                    if (!prefixMatch) continue;
+                    const rawLinkName = (linkEl as HTMLElement).dataset.href || '';
+                    const pageName = rawLinkName.split('|')[0].trim();
+                    let filePath: string;
+                    if (pageName) {
+                        let dir = '';
+                        if (context.sourcePath) {
+                            const lastSlash = context.sourcePath.lastIndexOf('/');
+                            dir = lastSlash >= 0 ? context.sourcePath.slice(0, lastSlash) : '';
+                        }
+                        const filename = pageName.endsWith('.md') ? pageName : `${pageName}.md`;
+                        filePath = dir ? `${dir}/${filename}` : filename;
+                    } else {
+                        filePath = context.sourcePath ?? '';
+                    }
+                    const resolved = resolveVaultPath(vaultRoot, filePath);
+                    let display: string;
+                    try {
+                        if (!resolved) throw new Error('invalid');
+                        const tree = builder.buildFromFile(resolved);
+                        const counts = tree.getCounts();
+                        const rawString = tree.getCompletionString();
+                        if (counts.total === 0) {
+                            display = rawString;
+                        } else {
+                            const percentage = Math.round((counts.completed / counts.total) * 100);
+                            display = template
+                                .replace('{completed}', `${counts.completed}`)
+                                .replace('{total}', `${counts.total}`)
+                                .replace('{percentage}', `${percentage}`);
+                            if (rawString.endsWith(' ❗')) {
+                                display += ' ❗';
+                            }
+                        }
+                    } catch {
+                        display = 'No tasks';
+                    }
+                    const beforeText = textContent.slice(0, prefixMatch.index);
+                    linkedReplacements.push({prevText, linkEl, beforeText, display});
+                }
+                for (const {prevText, linkEl, beforeText, display} of linkedReplacements) {
+                    const span = document.createElement('span');
+                    span.addClass('completed-task-reading');
+                    span.setText(display);
+                    const frag = document.createDocumentFragment();
+                    if (beforeText) frag.append(beforeText);
+                    frag.append(span);
+                    prevText.replaceWith(frag);
+                    linkEl.remove();
                 }
             });
         });
@@ -256,7 +321,11 @@ export default class ProgressTrackerLablePlugin extends Plugin {
                             const linkName = match[1];
                            // Determine target file path: if linkName empty, use current source path
                            if (linkName && linkName.trim() !== '') {
-                               const dir = sourcePath ? sourcePath.replace(/\/[^/]+$/, '') : '';
+                               let dir = '';
+                               if (sourcePath) {
+                                   const lastSlash = sourcePath.lastIndexOf('/');
+                                   dir = lastSlash >= 0 ? sourcePath.slice(0, lastSlash) : '';
+                               }
                                const filename = linkName.endsWith('.md') ? linkName : `${linkName}.md`;
                                filePath = dir ? `${dir}/${filename}` : filename;
                            } else if (sourcePath) {
@@ -347,12 +416,12 @@ export default class ProgressTrackerLablePlugin extends Plugin {
                 return;
             }
             const cached = this.pageTasksCache;
-            // Compare cached and actual tasks (shallow, by length and line numbers)
+            // Compare cached and actual tasks (shallow, by length, line numbers, indent and completion state)
             if (
                 this.lastOpenedFilePath === modifiedPath &&
                 cached &&
                 cached.length === actualTasks.length &&
-                cached.every((t, i) => t.line === actualTasks[i].line && t.completed === actualTasks[i].completed)
+                cached.every((t, i) => t.line === actualTasks[i].line && t.completed === actualTasks[i].completed && t.indent === actualTasks[i].indent)
             ) {
                 return;
             }

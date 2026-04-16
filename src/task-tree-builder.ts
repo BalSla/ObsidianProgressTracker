@@ -85,7 +85,7 @@ export class TaskTreeBuilder {
     this.fileStack.push(absPath);
 
     const content = fs.readFileSync(absPath, 'utf-8');
-    // ignore pages tagged to skip task tree (properly handles frontmatter and code blocks)
+    // ignore pages tagged to skip task tree (respects frontmatter and excludes code blocks)
     if (containsTag(content, this.ignoreTag)) {
       this.fileStack.pop();
       return new TaskTree([]);
