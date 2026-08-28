@@ -20,7 +20,8 @@ export interface UpdateResult {
 export function parseTasks(
   lines: string[],
   currentDir?: string,
-  builder?: TaskTreeBuilder
+  builder?: TaskTreeBuilder,
+  currentFilePath?: string
 ): ParsedTaskInfo[] {
   const tasks: ParsedTaskInfo[] = [];
   const stack: Array<{ indent: number; task?: ParsedTaskInfo }> = [
@@ -52,14 +53,9 @@ export function parseTasks(
         hasLink = true;
         const rawLink = m[1];
         const pageName = rawLink.split('|')[0].trim();
-        const fileName = pageName.toLowerCase().endsWith('.md')
-          ? pageName
-          : `${pageName}.md`;
-        const linkPath = path.resolve(currentDir, fileName);
+        const fileName = pageName.toLowerCase().endsWith('.md') ? pageName : `${pageName}.md`;
+        const linkPath = builder.resolveLinkPath(pageName, currentFilePath ?? path.join(currentDir, fileName));
         if (fs.existsSync(linkPath)) {
-          if (builder.shouldIgnoreFile(linkPath)) {
-            continue;
-          }
           try {
             const tree = builder.buildFromFile(linkPath);
             const counts = tree.getCounts();
@@ -87,6 +83,7 @@ export function parseTasks(
           task.linkChildrenComplete = false;
         }
       }
+      console.log(`[ProgressTracker(LA)] Line ${i + 1}: linkChildrenComplete=${task.linkChildrenComplete}`);
     } else if (currentDir) {
       // Simulate linkChildrenComplete for test cases when builder is not provided but currentDir is
       const linkRegex = /\[\[([^\]]+)\]\]/g;
@@ -175,7 +172,8 @@ export function updateParentStatuses(
   filePath?: string,
   rootDir?: string,
   ignoreTag: string = 'ignoretasktree',
-  autoPropagateTaskStates: boolean = true
+  autoPropagateTaskStates: boolean = true,
+  taskTreeBuilder?: TaskTreeBuilder
 ): UpdateResult {
   if (!autoPropagateTaskStates) {
     // If disabled, do not change any parent states, just return the content and state
@@ -189,13 +187,16 @@ export function updateParentStatuses(
   }
 
   const lines = content.split(/\r?\n/);
-  let builder: TaskTreeBuilder | undefined = undefined;
+  let builder = taskTreeBuilder;
   let dir: string | undefined = undefined;
   if (filePath && rootDir) {
     dir = path.dirname(path.isAbsolute(filePath) ? filePath : path.resolve(rootDir, filePath));
-    builder = new TaskTreeBuilder(rootDir, ignoreTag);
+    builder ??= new TaskTreeBuilder(rootDir, ignoreTag);
   }
-  const tasks = parseTasks(lines, dir, builder);
+  const sourcePath = filePath && rootDir
+    ? (path.isAbsolute(filePath) ? filePath : path.resolve(rootDir, filePath))
+    : undefined;
+  const tasks = parseTasks(lines, dir, builder, sourcePath);
 
   const sorted = tasks.slice().sort((a, b) => b.indent - a.indent);
 

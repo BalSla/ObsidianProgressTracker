@@ -3,6 +3,8 @@ import * as path from 'path';
 import { ParsedTaskNode, TaskTree } from './task-tree';
 import { escapeRegex, containsTag } from './utils';
 
+export type LinkPathResolver = (linkPath: string, sourcePath: string) => string | undefined;
+
 /**
  * Builds a TaskTree from an Obsidian markdown page by parsing tasks and recursively including linked pages.
  */
@@ -10,6 +12,7 @@ export class TaskTreeBuilder {
   private cache = new Set<string>();
   private rootDir: string;
   private ignoreTag: string;
+  private linkPathResolver?: LinkPathResolver;
   private fileStack: string[] = [];  // track current file recursion stack
   private hasFileCycle: boolean = false;
 
@@ -21,10 +24,19 @@ export class TaskTreeBuilder {
   /**
    * @param rootDir Base directory for resolving relative paths (e.g., vault root in Obsidian).
    */
-  constructor(rootDir?: string, ignoreTag: string = 'ignoretasktree') {
+  constructor(rootDir?: string, ignoreTag: string = 'ignoretasktree', linkPathResolver?: LinkPathResolver) {
     // Normalize and resolve the root directory so comparisons are reliable
     this.rootDir = path.resolve(rootDir || process.cwd());
     this.ignoreTag = ignoreTag;
+    this.linkPathResolver = linkPathResolver;
+  }
+
+  public resolveLinkPath(linkPath: string, sourcePath: string): string {
+    const resolvedByVault = this.linkPathResolver?.(linkPath, sourcePath);
+    const fileName = linkPath.toLowerCase().endsWith('.md') ? linkPath : `${linkPath}.md`;
+    return resolvedByVault
+      ? path.resolve(this.rootDir, resolvedByVault)
+      : path.resolve(path.dirname(sourcePath), fileName);
   }
 
   /**
@@ -91,7 +103,7 @@ export class TaskTreeBuilder {
       return new TaskTree([]);
     }
     const lines = content.split(/\r?\n/);
-    const nodes = this.parseLines(lines, path.dirname(absPath));
+    const nodes = this.parseLines(lines, absPath);
     this.fileStack.pop();
     const tree = new TaskTree(nodes);
     return tree;
@@ -100,7 +112,7 @@ export class TaskTreeBuilder {
   /**
    * Parses lines of markdown to extract tasks, respecting indentation and recursively handling links.
    */
-  private parseLines(lines: string[], currentDir: string): ParsedTaskNode[] {
+  private parseLines(lines: string[], currentFilePath: string): ParsedTaskNode[] {
     const rootNodes: ParsedTaskNode[] = [];
     const stack: Array<{ indent: number; children: ParsedTaskNode[]; isTask: boolean }> = [
       { indent: -1, children: rootNodes, isTask: false },
@@ -125,8 +137,7 @@ export class TaskTreeBuilder {
           const rawLink = linkMatch[1];
           const pageName = rawLink.split('|')[0].trim();
           // preserve .md extension if present
-          const fileName = pageName.toLowerCase().endsWith('.md') ? pageName : `${pageName}.md`;
-          const linkPath = path.resolve(currentDir, fileName);
+          const linkPath = this.resolveLinkPath(pageName, currentFilePath);
           if (this.isPathInsideRoot(linkPath) && fs.existsSync(linkPath)) {
             // detect page link cycles by checking recursion stack
             if (this.fileStack.includes(linkPath)) {
@@ -173,8 +184,7 @@ export class TaskTreeBuilder {
             const rawLink = linkMatch[1];
             const pageName = rawLink.split('|')[0].trim();
             // preserve .md extension if present
-            const fileName = pageName.toLowerCase().endsWith('.md') ? pageName : `${pageName}.md`;
-            const linkPath = path.resolve(currentDir, fileName);
+            const linkPath = this.resolveLinkPath(pageName, currentFilePath);
             if (this.isPathInsideRoot(linkPath) && fs.existsSync(linkPath)) {
               // detect page link cycles by checking recursion stack
               if (!this.fileStack.includes(linkPath) && !linkedPagesInFile.has(linkPath)) {

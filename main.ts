@@ -47,7 +47,7 @@ function resolveVaultPath(root: string, filePath: string): string | undefined {
 }
 
 export default class ProgressTrackerLablePlugin extends Plugin {
-    settings: ProgressTrackerLableSettings;
+    settings!: ProgressTrackerLableSettings;
     private fileStates: Map<string, Map<number, boolean>> = new Map();
     private skipModify = false;
     // Plugin-level cache: only the active page's ParsedTaskInfo[]
@@ -431,23 +431,29 @@ export default class ProgressTrackerLablePlugin extends Plugin {
         const visited = new Set<string>();
         await this.updateFileAndBacklinks(modifiedPath, visited, root);
     }
-    private async updateFileAndBacklinks(path: string, visited: Set<string>, root: string) {
-        if (visited.has(path)) return;
-        visited.add(path);
-        const abstract = this.app.vault.getAbstractFileByPath(path);
+    private async updateFileAndBacklinks(filePath: string, visited: Set<string>, root: string) {
+        if (visited.has(filePath)) return;
+        visited.add(filePath);
+        const abstract = this.app.vault.getAbstractFileByPath(filePath);
         if (!(abstract instanceof TFile)) return;
         try {
             const content = await this.app.vault.read(abstract);
-            const prev = this.fileStates.get(path);
+            const prev = this.fileStates.get(filePath);
+            const builder = new TaskTreeBuilder(root, this.settings.ignoreTag, (linkPath, sourcePath) => {
+                const sourceVaultPath = path.relative(root, sourcePath);
+                const linkedFile = this.app.metadataCache.getFirstLinkpathDest?.(linkPath, sourceVaultPath);
+                return linkedFile?.path;
+            });
             const result = updateParentStatuses(
                 content,
                 prev,
-                path,
+                filePath,
                 root,
                 this.settings.ignoreTag,
-                this.settings.autoPropagateTaskStates
+                this.settings.autoPropagateTaskStates,
+                builder
             );
-            this.fileStates.set(path, result.state);
+            this.fileStates.set(filePath, result.state);
             if (result.content !== content) {
                 this.skipModify = true;
                 await this.app.vault.modify(abstract, result.content);
@@ -458,13 +464,14 @@ export default class ProgressTrackerLablePlugin extends Plugin {
 
         const leaves = this.app.workspace.getLeavesOfType("markdown");
         for (const leaf of leaves) {
-            if (leaf.view instanceof MarkdownView && leaf.view.file?.path === path) {
+            if (leaf.view instanceof MarkdownView && leaf.view.file?.path === filePath) {
                 leaf.view.previewMode.rerender(true);
             }
         }
 
-        const backlinks = findBacklinkSources(this.app, path);
+        const backlinks = findBacklinkSources(this.app, filePath);
         for (const source of backlinks) {
+            console.log('[ProgressTracker] Updating backlinks for source', source);
             await this.updateFileAndBacklinks(source, visited, root);
         }
     }
