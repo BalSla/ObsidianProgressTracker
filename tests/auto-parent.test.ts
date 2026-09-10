@@ -1,4 +1,5 @@
-import { updateParentStatuses, parseTasks } from '../src/auto-parent';
+import * as path from 'path';
+import { updateParentStatuses, parseTasks, haveTaskTrackingInputsChanged } from '../src/auto-parent';
 
 describe('updateParentStatuses', () => {
   test('checks parent when all children complete', () => {
@@ -152,5 +153,48 @@ describe('indent change detection via parseTasks', () => {
     expect(result.content).toBe(
       ['- [x] Parent', '  - [x] Child1', '  - [x] Child2'].join('\n')
     );
+  });
+});
+
+describe('task tracking change detection', () => {
+  test('ignores task text edits when status, structure, and links are unchanged', () => {
+    const before = parseTasks([
+      '- [ ] Parent [[Project]] text before',
+      '  - [x] Child',
+    ], undefined, undefined, undefined, false);
+    const after = parseTasks([
+      '- [ ] Parent [[Project]] text after',
+      '  - [x] Child',
+    ], undefined, undefined, undefined, false);
+
+    expect(haveTaskTrackingInputsChanged(before, after)).toBe(false);
+  });
+
+  test('detects task link target changes', () => {
+    const before = parseTasks(['- [ ] Parent [[Project]]'], undefined, undefined, undefined, false);
+    const after = parseTasks(['- [ ] Parent [[Other Project]]'], undefined, undefined, undefined, false);
+
+    expect(haveTaskTrackingInputsChanged(before, after)).toBe(true);
+  });
+
+  test('does not evaluate linked pages when only tracking task inputs', () => {
+    const builder = {
+      resolveLinkPath: jest.fn(() => path.join(__dirname, 'fixtures', 'subpage.md')),
+      buildFromFile: jest.fn(() => {
+        throw new Error('should not build linked trees');
+      }),
+    };
+
+    const tasks = parseTasks(
+      ['- [ ] Parent [[subpage]]'],
+      path.join(__dirname, 'fixtures'),
+      builder as any,
+      path.join(__dirname, 'fixtures', 'main-linked-complete.md'),
+      false
+    );
+
+    expect(tasks[0].linkTargets).toEqual(['subpage']);
+    expect(tasks[0].linkChildrenComplete).toBe(undefined);
+    expect(builder.buildFromFile).not.toHaveBeenCalled();
   });
 });

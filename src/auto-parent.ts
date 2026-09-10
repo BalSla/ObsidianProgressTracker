@@ -8,6 +8,7 @@ export interface ParsedTaskInfo {
   completed: boolean;
   parent?: ParsedTaskInfo;
   children: ParsedTaskInfo[];
+  linkTargets: string[];
   /** True if all linked pages' tasks are complete */
   linkChildrenComplete?: boolean;
 }
@@ -17,11 +18,42 @@ export interface UpdateResult {
   state: Map<number, boolean>;
 }
 
+function getTaskLinkTargets(text: string): string[] {
+  const linkRegex = /\[\[([^\]]+)\]\]/g;
+  return Array.from(text.matchAll(linkRegex), (match) =>
+    match[1].split('|')[0].trim()
+  ).filter(Boolean);
+}
+
+export function haveTaskTrackingInputsChanged(
+  previous: ParsedTaskInfo[] | null,
+  next: ParsedTaskInfo[]
+): boolean {
+  if (!previous || previous.length !== next.length) {
+    return true;
+  }
+
+  return previous.some((task, index) => {
+    const other = next[index];
+    if (
+      task.line !== other.line ||
+      task.indent !== other.indent ||
+      task.completed !== other.completed ||
+      task.linkTargets.length !== other.linkTargets.length
+    ) {
+      return true;
+    }
+
+    return task.linkTargets.some((link, linkIndex) => link !== other.linkTargets[linkIndex]);
+  });
+}
+
 export function parseTasks(
   lines: string[],
   currentDir?: string,
   builder?: TaskTreeBuilder,
-  currentFilePath?: string
+  currentFilePath?: string,
+  evaluateLinkChildren: boolean = true
 ): ParsedTaskInfo[] {
   const tasks: ParsedTaskInfo[] = [];
   const stack: Array<{ indent: number; task?: ParsedTaskInfo }> = [
@@ -40,19 +72,15 @@ export function parseTasks(
         indent,
         completed,
         children: [],
+        linkTargets: getTaskLinkTargets(text),
       };
 
-    if (builder && currentDir) {
-      const linkRegex = /\[\[([^\]]+)\]\]/g;
-      const matches = text.matchAll(linkRegex);
-      let hasLink = false;
+    if (evaluateLinkChildren && builder && currentDir) {
+      let hasLink = task.linkTargets.length > 0;
       let allLinkComplete = true;
       let anyLinkHasTasks = false;
       let anyLinkIncomplete = false;
-      for (const m of matches) {
-        hasLink = true;
-        const rawLink = m[1];
-        const pageName = rawLink.split('|')[0].trim();
+      for (const pageName of task.linkTargets) {
         const fileName = pageName.toLowerCase().endsWith('.md') ? pageName : `${pageName}.md`;
         const linkPath = builder.resolveLinkPath(pageName, currentFilePath ?? path.join(currentDir, fileName));
         if (fs.existsSync(linkPath)) {
@@ -83,19 +111,13 @@ export function parseTasks(
           task.linkChildrenComplete = false;
         }
       }
-      console.log(`[ProgressTracker(LA)] Line ${i + 1}: linkChildrenComplete=${task.linkChildrenComplete}`);
-    } else if (currentDir) {
+    } else if (evaluateLinkChildren && currentDir) {
       // Simulate linkChildrenComplete for test cases when builder is not provided but currentDir is
-      const linkRegex = /\[\[([^\]]+)\]\]/g;
-      const matches = text.matchAll(linkRegex);
-      let hasLink = false;
+      let hasLink = task.linkTargets.length > 0;
       let allLinkComplete = true;
       let anyLinkHasTasks = false;
       let anyLinkIncomplete = false;
-      for (const m of matches) {
-        hasLink = true;
-        const rawLink = m[1];
-        const pageName = rawLink.split('|')[0].trim();
+      for (const pageName of task.linkTargets) {
         const fileName = pageName.toLowerCase().endsWith('.md')
           ? pageName
           : `${pageName}.md`;
