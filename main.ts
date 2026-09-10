@@ -12,7 +12,7 @@ import { editorLivePreviewField } from "obsidian"; // Required for CM6 editor ex
 import { Extension, RangeSetBuilder } from '@codemirror/state';
 import { ViewPlugin, Decoration, DecorationSet, ViewUpdate, WidgetType, EditorView } from '@codemirror/view';
 import { TaskTreeBuilder } from './src/task-tree-builder';
-import { updateParentStatuses, parseTasks, ParsedTaskInfo } from './src/auto-parent';
+import { updateParentStatuses, parseTasks, ParsedTaskInfo, haveTaskTrackingInputsChanged } from './src/auto-parent';
 import { escapeRegex, containsTag } from './src/utils';
 
 
@@ -246,8 +246,7 @@ export default class ProgressTrackerLablePlugin extends Plugin {
             }
             const lines = content.split(/\r?\n/);
             const dir = path.dirname(absPath);
-            const builder = new TaskTreeBuilder(vaultRoot, this.settings.ignoreTag);
-            const tasks = parseTasks(lines, dir, builder);
+            const tasks = parseTasks(lines, dir, undefined, undefined, false);
             if (!tasks || tasks.length === 0) {
                 return;
             }
@@ -410,19 +409,16 @@ export default class ProgressTrackerLablePlugin extends Plugin {
             }
             const lines = content.split(/\r?\n/);
             const dir = path.dirname(resolveVaultPath(root, modifiedPath) ?? '');
-            const builder = new TaskTreeBuilder(root, this.settings.ignoreTag);
-            const actualTasks = parseTasks(lines, dir, builder);
+            const actualTasks = parseTasks(lines, dir, undefined, undefined, false);
             if (!actualTasks || actualTasks.length === 0) {
                 return;
             }
             const cached = this.pageTasksCache;
-            // Compare cached and actual tasks (shallow, by length, line numbers, indent and completion state)
             if (
                 this.lastOpenedFilePath === modifiedPath &&
-                cached &&
-                cached.length === actualTasks.length &&
-                cached.every((t, i) => t.line === actualTasks[i].line && t.completed === actualTasks[i].completed && t.indent === actualTasks[i].indent)
+                !haveTaskTrackingInputsChanged(cached, actualTasks)
             ) {
+                this.pageTasksCache = actualTasks;
                 return;
             }
         } catch (e) {
@@ -457,6 +453,17 @@ export default class ProgressTrackerLablePlugin extends Plugin {
             if (result.content !== content) {
                 this.skipModify = true;
                 await this.app.vault.modify(abstract, result.content);
+            }
+            if (this.lastOpenedFilePath === filePath && !containsTag(result.content, this.settings.ignoreTag)) {
+                const cachePath = resolveVaultPath(root, filePath);
+                const currentTasks = parseTasks(
+                    result.content.split(/\r?\n/),
+                    path.dirname(cachePath ?? ''),
+                    undefined,
+                    undefined,
+                    false
+                );
+                this.pageTasksCache = currentTasks.length > 0 ? currentTasks : null;
             }
         } catch (e) {
             console.error(e);
